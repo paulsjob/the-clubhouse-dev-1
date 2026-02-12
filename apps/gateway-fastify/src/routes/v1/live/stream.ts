@@ -7,7 +7,25 @@ import { wrapSuccess, wrapError } from '../../../utils/responses';
 import { SchemaSnapshotV1 } from '@renderless/contracts';
 
 export const streamRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.get('/v1/live/stream/:topic', async (request, reply) => {
+  fastify.get('/v1/live/stream/:topic', {
+    schema: {
+      tags: ['Live'],
+      summary: 'Live SSE stream',
+      description: 'Subscribe to real-time updates for a specific topic via Server-Sent Events.',
+      params: { type: 'object', properties: { topic: { type: 'string' } } },
+      response: {
+        200: {
+          description: 'SSE stream',
+          type: 'string',
+          content: {
+            'text/event-stream': {
+              schema: { type: 'string' }
+            }
+          }
+        }
+      }
+    } as any
+  }, async (request, reply) => {
     const { topic } = request.params as { topic: string };
     const orgId = request.rl.orgId;
 
@@ -16,7 +34,6 @@ export const streamRoutes: FastifyPluginAsync = async (fastify) => {
     reply.raw.setHeader('Connection', 'keep-alive');
     reply.raw.flushHeaders();
 
-    // Send last known value immediately if it exists
     const lastValue = ephemeralStateStore.get(`${orgId}:${topic}`);
     if (lastValue) {
       const payload = JSON.stringify({
@@ -31,12 +48,16 @@ export const streamRoutes: FastifyPluginAsync = async (fastify) => {
 
     pubSubService.addConnection(orgId, topic, reply);
 
-    // Keep the request open
     await new Promise(() => {});
   });
 
-  // ITEM 08: Topic Schema Discovery
-  fastify.get('/v1/live/topics/:topic/schema', async (request, reply) => {
+  fastify.get('/v1/live/topics/:topic/schema', {
+    schema: {
+      tags: ['Live'],
+      summary: 'Discover topic schema',
+      params: { type: 'object', properties: { topic: { type: 'string' } } }
+    } as any
+  }, async (request, reply) => {
     const { topic } = request.params as { topic: string };
     const orgId = request.rl.orgId;
 

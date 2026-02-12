@@ -14,6 +14,9 @@ export interface AppConfig {
   persistEnabled: boolean;
   persistDir: string;
   persistIncludeSecrets: boolean;
+  // ITEM 11: Documentation
+  docsEnabled: boolean;
+  docsRoutePrefix: string;
 }
 
 const parseOrgKeys = (json?: string): Record<string, string> => {
@@ -46,8 +49,10 @@ export const config: AppConfig = {
   corsOrigins: parseCorsOrigins(process.env.CORS_ORIGINS),
   rateLimitMax: parseInt(process.env.RATE_LIMIT_MAX || '120', 10),
   rateLimitWindowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10),
-  // ITEM 10: Defaults
   persistEnabled: process.env.PERSIST_ENABLED ? process.env.PERSIST_ENABLED === 'true' : nodeEnv !== 'production',
   persistDir: process.env.PERSIST_DIR || path.join(os.tmpdir(), 'rl-gateway-store'),
   persistIncludeSecrets: nodeEnv === 'production' ? false : process.env.PERSIST_INCLUDE_SECRETS === 'true',
+  // ITEM 11: Defaults
+  docsEnabled: process.env.DOCS_ENABLED ? process.env.DOCS_ENABLED === 'true' : nodeEnv !== 'production',
+  docsRoutePrefix: process.env.DOCS_ROUTE_PREFIX || '/docs',
 };

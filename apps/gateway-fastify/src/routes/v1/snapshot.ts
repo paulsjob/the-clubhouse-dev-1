@@ -6,7 +6,17 @@ import { SnapshotImportV1Schema, CONTRACTS_VERSION } from '@renderless/contracts
 import { config } from '../../config';
 
 export const snapshotRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.get('/v1/snapshot/export', async (request, reply) => {
+  fastify.get('/v1/snapshot/export', {
+    schema: {
+      tags: ['Snapshot'],
+      summary: 'Export organization snapshot',
+      description: 'Returns a complete backup of organization resources.',
+      querystring: {
+        type: 'object',
+        properties: { includeSecrets: { type: 'boolean', default: false } }
+      }
+    } as any
+  }, async (request, reply) => {
     const includeSecrets = request.query && (request.query as any).includeSecrets === 'true';
     const orgId = request.rl.orgId;
 
@@ -32,7 +42,21 @@ export const snapshotRoutes: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-  fastify.post('/v1/snapshot/import', async (request, reply) => {
+  fastify.post('/v1/snapshot/import', {
+    schema: {
+      tags: ['Snapshot'],
+      summary: 'Import organization snapshot',
+      description: 'Restore organization resources from a previous export.',
+      body: {
+        type: 'object',
+        required: ['mode', 'snapshot'],
+        properties: {
+          mode: { type: 'string', enum: ['merge', 'replace'] },
+          snapshot: { type: 'object' }
+        }
+      }
+    } as any
+  }, async (request, reply) => {
     const orgId = request.rl.orgId;
     const body = request.body as any;
 

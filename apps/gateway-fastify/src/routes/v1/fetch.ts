@@ -4,7 +4,26 @@ import { internalFetch } from '../../services/fetcher';
 import { wrapSuccess, wrapError } from '../../utils/responses';
 
 export const fetchRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.post('/v1/fetch', async (request, reply) => {
+  fastify.post('/v1/fetch', {
+    schema: {
+      tags: ['Fetch'],
+      summary: 'Proxy request',
+      description: 'Execute an authenticated HTTP request to a defined resource.',
+      body: {
+        type: 'object',
+        required: ['resourceId'],
+        properties: {
+          resourceId: { type: 'string' },
+          credentialId: { type: 'string' },
+          method: { type: 'string' },
+          path: { type: 'string' },
+          query: { type: 'object' },
+          headers: { type: 'object' },
+          body: { type: 'object' }
+        }
+      }
+    } as any
+  }, async (request, reply) => {
     try {
       const result = await internalFetch({
         orgId: request.rl.orgId,

@@ -6,19 +6,35 @@ import { wrapSuccess, wrapError } from '../../utils/responses';
 import { GraphSchema } from '@renderless/contracts';
 
 export const graphRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.get('/v1/graphs', async (request) => {
+  fastify.get('/v1/graphs', {
+    schema: {
+      tags: ['Graphs'],
+      summary: 'List logic graphs',
+    } as any
+  }, async (request) => {
     const items = await graphStore.list(request.rl.orgId);
     return wrapSuccess(items, request.id);
   });
 
-  fastify.get('/v1/graphs/:id', async (request, reply) => {
+  fastify.get('/v1/graphs/:id', {
+    schema: {
+      tags: ['Graphs'],
+      summary: 'Get graph definition',
+      params: { type: 'object', properties: { id: { type: 'string' } } }
+    } as any
+  }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const item = await graphStore.get(request.rl.orgId, id);
     if (!item) return reply.code(404).send(wrapError('NOT_FOUND', 'Graph not found', request.id));
     return wrapSuccess(item, request.id);
   });
 
-  fastify.post('/v1/graphs', async (request, reply) => {
+  fastify.post('/v1/graphs', {
+    schema: {
+      tags: ['Graphs'],
+      summary: 'Create graph',
+    } as any
+  }, async (request, reply) => {
     const body = request.body as any;
     const id = `graph_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
     const newGraph = {
@@ -36,7 +52,13 @@ export const graphRoutes: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-  fastify.put('/v1/graphs/:id', async (request, reply) => {
+  fastify.put('/v1/graphs/:id', {
+    schema: {
+      tags: ['Graphs'],
+      summary: 'Update graph',
+      params: { type: 'object', properties: { id: { type: 'string' } } }
+    } as any
+  }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const body = request.body as any;
     const updated = await graphStore.update(request.rl.orgId, id, body);
@@ -44,14 +66,28 @@ export const graphRoutes: FastifyPluginAsync = async (fastify) => {
     return wrapSuccess(updated, request.id);
   });
 
-  fastify.delete('/v1/graphs/:id', async (request, reply) => {
+  fastify.delete('/v1/graphs/:id', {
+    schema: {
+      tags: ['Graphs'],
+      summary: 'Delete graph',
+      params: { type: 'object', properties: { id: { type: 'string' } } }
+    } as any
+  }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const success = await graphStore.delete(request.rl.orgId, id);
     if (!success) return reply.code(404).send(wrapError('NOT_FOUND', 'Graph not found', request.id));
     return wrapSuccess({ deleted: true }, request.id);
   });
 
-  fastify.post('/v1/graphs/:id/run', async (request, reply) => {
+  fastify.post('/v1/graphs/:id/run', {
+    schema: {
+      tags: ['Graphs'],
+      summary: 'Execute graph',
+      description: 'Run the logic graph with provided parameters.',
+      params: { type: 'object', properties: { id: { type: 'string' } } },
+      body: { type: 'object', properties: { params: { type: 'object' } } }
+    } as any
+  }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const { params } = (request.body as any) || {};
 

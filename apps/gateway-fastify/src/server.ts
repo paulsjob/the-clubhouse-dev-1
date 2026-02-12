@@ -1,5 +1,7 @@
 
 import Fastify, { FastifyInstance } from 'fastify';
+import swagger from '@fastify/swagger';
+import swaggerUi from '@fastify/swagger-ui';
 import { config } from './config';
 import corsPlugin from './plugins/cors';
 import authPlugin from './plugins/auth';
@@ -14,6 +16,7 @@ import { streamRoutes } from './routes/v1/live/stream';
 import { graphRoutes } from './routes/v1/graphs';
 import { outputRoutes } from './routes/v1/outputs';
 import { snapshotRoutes } from './routes/v1/snapshot';
+import pkg from '../package.json';
 
 export const buildServer = (): FastifyInstance => {
   const server = Fastify({
@@ -26,9 +29,53 @@ export const buildServer = (): FastifyInstance => {
         },
       },
     } : true,
-    // Use Fastify's built-in request ID generator
     requestIdHeader: 'x-request-id',
   });
+
+  // ITEM 11: Swagger Registration
+  server.register(swagger, {
+    openapi: {
+      info: {
+        title: 'Renderless Gateway',
+        description: 'Multi-tenant live data compositor gateway',
+        version: pkg.version
+      },
+      servers: [
+        { url: `http://localhost:${config.port}`, description: 'Local Development' }
+      ],
+      components: {
+        securitySchemes: {
+          orgIdHeader: {
+            type: 'apiKey',
+            name: 'x-rl-org-id',
+            in: 'header',
+            description: 'The Organization ID'
+          },
+          apiKeyHeader: {
+            type: 'apiKey',
+            name: 'x-rl-api-key',
+            in: 'header',
+            description: 'The API Key for the Organization'
+          }
+        }
+      },
+      security: [
+        { orgIdHeader: [], apiKeyHeader: [] }
+      ]
+    }
+  });
+
+  if (config.docsEnabled) {
+    server.register(swaggerUi, {
+      routePrefix: config.docsRoutePrefix,
+      uiConfig: {
+        docExpansion: 'list',
+        deepLinking: false
+      },
+      staticCSP: true,
+      transformStaticCSP: (header) => header
+    });
+  }
 
   // Register Plugins
   server.register(corsPlugin);

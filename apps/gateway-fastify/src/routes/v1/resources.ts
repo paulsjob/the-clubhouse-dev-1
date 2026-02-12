@@ -5,19 +5,36 @@ import { wrapSuccess, wrapError } from '../../utils/responses';
 import { ResourceSchema } from '@renderless/contracts';
 
 export const resourceRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.get('/v1/resources', async (request) => {
+  fastify.get('/v1/resources', {
+    schema: {
+      tags: ['Resources'],
+      summary: 'List resources',
+      description: 'Returns all defined resources for the current organization.',
+    } as any
+  }, async (request) => {
     const items = await resourceStore.list(request.rl.orgId);
     return wrapSuccess(items, request.id);
   });
 
-  fastify.get('/v1/resources/:id', async (request, reply) => {
+  fastify.get('/v1/resources/:id', {
+    schema: {
+      tags: ['Resources'],
+      summary: 'Get resource',
+      params: { type: 'object', properties: { id: { type: 'string' } } }
+    } as any
+  }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const item = await resourceStore.get(request.rl.orgId, id);
     if (!item) return reply.code(404).send(wrapError('NOT_FOUND', 'Resource not found', request.id));
     return wrapSuccess(item, request.id);
   });
 
-  fastify.post('/v1/resources', async (request, reply) => {
+  fastify.post('/v1/resources', {
+    schema: {
+      tags: ['Resources'],
+      summary: 'Create resource',
+    } as any
+  }, async (request, reply) => {
     const body = request.body as any;
     const id = `res_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
     const newRes = {
@@ -36,7 +53,13 @@ export const resourceRoutes: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-  fastify.put('/v1/resources/:id', async (request, reply) => {
+  fastify.put('/v1/resources/:id', {
+    schema: {
+      tags: ['Resources'],
+      summary: 'Update resource',
+      params: { type: 'object', properties: { id: { type: 'string' } } }
+    } as any
+  }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const body = request.body as any;
     const updated = await resourceStore.update(request.rl.orgId, id, body);
@@ -44,7 +67,13 @@ export const resourceRoutes: FastifyPluginAsync = async (fastify) => {
     return wrapSuccess(updated, request.id);
   });
 
-  fastify.delete('/v1/resources/:id', async (request, reply) => {
+  fastify.delete('/v1/resources/:id', {
+    schema: {
+      tags: ['Resources'],
+      summary: 'Delete resource',
+      params: { type: 'object', properties: { id: { type: 'string' } } }
+    } as any
+  }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const success = await resourceStore.delete(request.rl.orgId, id);
     if (!success) return reply.code(404).send(wrapError('NOT_FOUND', 'Resource not found', request.id));

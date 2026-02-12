@@ -7,19 +7,35 @@ import { wrapSuccess, wrapError } from '../../utils/responses';
 import { OutputSchema, SchemaSnapshotV1 } from '@renderless/contracts';
 
 export const outputRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.get('/v1/outputs', async (request) => {
+  fastify.get('/v1/outputs', {
+    schema: {
+      tags: ['Outputs'],
+      summary: 'List outputs',
+    } as any
+  }, async (request) => {
     const items = await outputStore.list(request.rl.orgId);
     return wrapSuccess(items, request.id);
   });
 
-  fastify.get('/v1/outputs/:id', async (request, reply) => {
+  fastify.get('/v1/outputs/:id', {
+    schema: {
+      tags: ['Outputs'],
+      summary: 'Get output',
+      params: { type: 'object', properties: { id: { type: 'string' } } }
+    } as any
+  }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const item = await outputStore.get(request.rl.orgId, id);
     if (!item) return reply.code(404).send(wrapError('NOT_FOUND', 'Output not found', request.id));
     return wrapSuccess(item, request.id);
   });
 
-  fastify.post('/v1/outputs', async (request, reply) => {
+  fastify.post('/v1/outputs', {
+    schema: {
+      tags: ['Outputs'],
+      summary: 'Create output',
+    } as any
+  }, async (request, reply) => {
     const body = request.body as any;
     const id = `out_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
     const newOutput = {
@@ -37,7 +53,13 @@ export const outputRoutes: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-  fastify.put('/v1/outputs/:id', async (request, reply) => {
+  fastify.put('/v1/outputs/:id', {
+    schema: {
+      tags: ['Outputs'],
+      summary: 'Update output',
+      params: { type: 'object', properties: { id: { type: 'string' } } }
+    } as any
+  }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const body = request.body as any;
     const updated = await outputStore.update(request.rl.orgId, id, body);
@@ -45,14 +67,27 @@ export const outputRoutes: FastifyPluginAsync = async (fastify) => {
     return wrapSuccess(updated, request.id);
   });
 
-  fastify.delete('/v1/outputs/:id', async (request, reply) => {
+  fastify.delete('/v1/outputs/:id', {
+    schema: {
+      tags: ['Outputs'],
+      summary: 'Delete output',
+      params: { type: 'object', properties: { id: { type: 'string' } } }
+    } as any
+  }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const success = await outputStore.delete(request.rl.orgId, id);
     if (!success) return reply.code(404).send(wrapError('NOT_FOUND', 'Output not found', request.id));
     return wrapSuccess({ deleted: true }, request.id);
   });
 
-  fastify.post('/v1/outputs/:id/run', async (request, reply) => {
+  fastify.post('/v1/outputs/:id/run', {
+    schema: {
+      tags: ['Outputs'],
+      summary: 'Execute output graph',
+      params: { type: 'object', properties: { id: { type: 'string' } } },
+      body: { type: 'object', properties: { params: { type: 'object' } } }
+    } as any
+  }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const { params } = (request.body as any) || {};
 
@@ -74,8 +109,14 @@ export const outputRoutes: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-  // ITEM 08: Schema Generation
-  fastify.post('/v1/outputs/:id/schema', async (request, reply) => {
+  fastify.post('/v1/outputs/:id/schema', {
+    schema: {
+      tags: ['Outputs'],
+      summary: 'Generate output schema',
+      params: { type: 'object', properties: { id: { type: 'string' } } },
+      body: { type: 'object', properties: { params: { type: 'object' } } }
+    } as any
+  }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const { params } = (request.body as any) || {};
 
@@ -109,7 +150,13 @@ export const outputRoutes: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-  fastify.get('/v1/outputs/:id/schema', async (request, reply) => {
+  fastify.get('/v1/outputs/:id/schema', {
+    schema: {
+      tags: ['Outputs'],
+      summary: 'Get latest output schema',
+      params: { type: 'object', properties: { id: { type: 'string' } } }
+    } as any
+  }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const snapshotId = latestOutputSchemaMap.get(id);
     if (!snapshotId) return reply.code(404).send(wrapError('NOT_FOUND', 'No schema recorded for this output', request.id));

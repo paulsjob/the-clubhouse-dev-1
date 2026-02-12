@@ -6,12 +6,22 @@ import { wrapSuccess, wrapError } from '../../../utils/responses';
 import { LiveSessionSchema } from '@renderless/contracts';
 
 export const liveSessionRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.get('/v1/live/sessions', async (request) => {
+  fastify.get('/v1/live/sessions', {
+    schema: {
+      tags: ['Live'],
+      summary: 'List live sessions',
+    } as any
+  }, async (request) => {
     const items = await liveSessionStore.list(request.rl.orgId);
     return wrapSuccess(items, request.id);
   });
 
-  fastify.post('/v1/live/sessions', async (request, reply) => {
+  fastify.post('/v1/live/sessions', {
+    schema: {
+      tags: ['Live'],
+      summary: 'Create live session',
+    } as any
+  }, async (request, reply) => {
     const body = request.body as any;
     const id = `sess_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
     
@@ -32,14 +42,26 @@ export const liveSessionRoutes: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-  fastify.get('/v1/live/sessions/:id', async (request, reply) => {
+  fastify.get('/v1/live/sessions/:id', {
+    schema: {
+      tags: ['Live'],
+      summary: 'Get live session',
+      params: { type: 'object', properties: { id: { type: 'string' } } }
+    } as any
+  }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const item = await liveSessionStore.get(request.rl.orgId, id);
     if (!item) return reply.code(404).send(wrapError('NOT_FOUND', 'Session not found', request.id));
     return wrapSuccess(item, request.id);
   });
 
-  fastify.post('/v1/live/sessions/:id/start', async (request, reply) => {
+  fastify.post('/v1/live/sessions/:id/start', {
+    schema: {
+      tags: ['Live'],
+      summary: 'Start session polling',
+      params: { type: 'object', properties: { id: { type: 'string' } } }
+    } as any
+  }, async (request, reply) => {
     const { id } = request.params as { id: string };
     try {
       await pollingService.startSession(request.rl.orgId, id);
@@ -49,13 +71,25 @@ export const liveSessionRoutes: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-  fastify.post('/v1/live/sessions/:id/stop', async (request) => {
+  fastify.post('/v1/live/sessions/:id/stop', {
+    schema: {
+      tags: ['Live'],
+      summary: 'Stop session polling',
+      params: { type: 'object', properties: { id: { type: 'string' } } }
+    } as any
+  }, async (request) => {
     const { id } = request.params as { id: string };
     await pollingService.stopSession(request.rl.orgId, id);
     return wrapSuccess({ status: 'terminated' }, request.id);
   });
 
-  fastify.delete('/v1/live/sessions/:id', async (request, reply) => {
+  fastify.delete('/v1/live/sessions/:id', {
+    schema: {
+      tags: ['Live'],
+      summary: 'Delete session',
+      params: { type: 'object', properties: { id: { type: 'string' } } }
+    } as any
+  }, async (request, reply) => {
     const { id } = request.params as { id: string };
     await pollingService.stopSession(request.rl.orgId, id);
     const success = await liveSessionStore.delete(request.rl.orgId, id);
