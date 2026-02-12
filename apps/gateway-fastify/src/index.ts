@@ -1,22 +1,18 @@
-
-
-import Fastify from 'fastify';
-// Fix: Explicitly import process from node:process to provide correct TypeScript definitions for process.exit
 import process from 'node:process';
+import { buildServer } from './server';
+import { config } from './config';
 
-const fastify = Fastify({
-  logger: true
-});
-
-fastify.get('/health', async (request, reply) => {
-  return { ok: true };
-});
+const server = buildServer();
 
 const start = async () => {
   try {
-    await fastify.listen({ port: 3000, host: '0.0.0.0' });
+    const address = await server.listen({ 
+      port: config.port, 
+      host: '0.0.0.0' 
+    });
+    server.log.info(`Gateway logic skeleton active at ${address}`);
   } catch (err) {
-    fastify.log.error(err);
+    server.log.error(err);
     process.exit(1);
   }
 };
