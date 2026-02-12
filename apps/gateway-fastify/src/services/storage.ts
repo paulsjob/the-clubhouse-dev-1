@@ -1,7 +1,7 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { Credential, Resource, LiveSession, Graph, Output, SchemaSnapshotV1, SnapshotV1 } from '@renderless/contracts';
+import { Credential, Resource, LiveSession, Graph, Output, SchemaSnapshotV1, SnapshotV1, Organization } from '@renderless/contracts';
 import { config } from '../config';
 
 export interface IStore<T> {
@@ -56,6 +56,16 @@ class InMemoryStore<T extends { id: string; orgId: string }> implements IStore<T
     }
     PersistenceManager.markDirty(orgId);
   }
+
+  // ITEM 12: Special method for global resources like Organizations
+  // In a real DB these would be in a different table, but here we can reuse the store.
+  async getAllGlobal(): Promise<T[]> {
+    return Array.from(this.items.values());
+  }
+
+  async getById(id: string): Promise<T | null> {
+    return this.items.get(id) || null;
+  }
 }
 
 export const credentialStore = new InMemoryStore<Credential>();
@@ -64,6 +74,10 @@ export const liveSessionStore = new InMemoryStore<LiveSession>();
 export const graphStore = new InMemoryStore<Graph>();
 export const outputStore = new InMemoryStore<Output>();
 export const schemaStore = new InMemoryStore<SchemaSnapshotV1>();
+
+// ITEM 12: Organization Store
+// We cast to any to reuse the orgId in the T constraint, although for Orgs, orgId is redundant with id.
+export const orgStore = new InMemoryStore<Organization & { orgId: string }>();
 
 // Last-known-value store for topics
 export const ephemeralStateStore = new Map<string, any>();
@@ -119,20 +133,18 @@ export async function importOrgSnapshot(orgId: string, snapshot: SnapshotV1, mod
 
 // ITEM 10: Persistence Manager
 export class PersistenceManager {
-  private static dirtyOrgs: Set<string> = new Set();
   private static saveTimers: Map<string, NodeJS.Timeout> = new Map();
 
   static markDirty(orgId: string) {
     if (!config.persistEnabled) return;
     
-    // Clear existing timer if any to reset debounce
     if (this.saveTimers.has(orgId)) {
       clearTimeout(this.saveTimers.get(orgId)!);
     }
 
     const timer = setTimeout(() => {
       this.saveOrg(orgId);
-    }, 500); // 500ms debounce
+    }, 500);
 
     this.saveTimers.set(orgId, timer);
   }
@@ -145,10 +157,7 @@ export class PersistenceManager {
       const filePath = path.join(config.persistDir, `${orgId}.json`);
       const tmpPath = `${filePath}.tmp`;
 
-      // Ensure directory exists
       await fs.mkdir(config.persistDir, { recursive: true });
-
-      // Atomic write: Write to tmp then rename
       await fs.writeFile(tmpPath, JSON.stringify(snapshot, null, 2), 'utf8');
       await fs.rename(tmpPath, filePath);
     } catch (err) {
@@ -174,8 +183,6 @@ export class PersistenceManager {
           const content = await fs.readFile(filePath, 'utf8');
           const snapshot = JSON.parse(content) as SnapshotV1;
           
-          // Use import helper with 'merge' to restore state
-          // Temporarily disable persist during load to avoid echo loop
           const originalPersist = config.persistEnabled;
           (config as any).persistEnabled = false;
           await importOrgSnapshot(orgId, snapshot, 'merge');

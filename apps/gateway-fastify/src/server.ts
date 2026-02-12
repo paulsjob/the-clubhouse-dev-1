@@ -16,6 +16,7 @@ import { streamRoutes } from './routes/v1/live/stream';
 import { graphRoutes } from './routes/v1/graphs';
 import { outputRoutes } from './routes/v1/outputs';
 import { snapshotRoutes } from './routes/v1/snapshot';
+import { orgRoutes } from './routes/v1/orgs';
 import pkg from '../package.json';
 
 export const buildServer = (): FastifyInstance => {
@@ -56,6 +57,12 @@ export const buildServer = (): FastifyInstance => {
             name: 'x-rl-api-key',
             in: 'header',
             description: 'The API Key for the Organization'
+          },
+          adminKeyHeader: {
+            type: 'apiKey',
+            name: 'x-rl-admin-key',
+            in: 'header',
+            description: 'The Administrative API Key'
           }
         }
       },
@@ -93,6 +100,7 @@ export const buildServer = (): FastifyInstance => {
   server.register(graphRoutes);
   server.register(outputRoutes);
   server.register(snapshotRoutes);
+  server.register(orgRoutes);
 
   return server;
 };

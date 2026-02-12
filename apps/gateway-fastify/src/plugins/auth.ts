@@ -3,13 +3,13 @@ import { FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
 import { config } from '../config';
 import { wrapError } from '../utils/responses';
+import { orgStore } from '../services/storage';
 
 declare module 'fastify' {
-  // Fix: Augmentation must match original FastifyRequest type parameters to avoid "identical type parameters" error
-  interface FastifyRequest<RouteGeneric, RawServer, RawRequest, SchemaCompiler, TypeProvider, ContextConfig, Logger> {
+  interface FastifyRequest {
     rl: {
       orgId: string;
-      authType: 'apiKey';
+      authType: 'apiKey' | 'admin';
     };
   }
 }
@@ -21,6 +21,12 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
       return;
     }
 
+    // ITEM 12: Organization management endpoints bypass tenant auth
+    // These will use their own preHandler for x-rl-admin-key
+    if (request.url.startsWith('/v1/orgs')) {
+      return;
+    }
+
     const orgId = request.headers['x-rl-org-id'] as string;
     const apiKey = request.headers['x-rl-api-key'] as string;
 
@@ -28,7 +34,17 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
       return reply.code(401).send(wrapError('UNAUTHORIZED', 'Missing auth headers', request.id));
     }
 
-    const expectedKey = config.orgKeys[orgId];
+    // Check static config first (backward compatibility)
+    let expectedKey = config.orgKeys[orgId];
+    
+    // If not in static config, check dynamic orgStore
+    if (!expectedKey) {
+      const org = await orgStore.getById(orgId);
+      if (org && org.isActive) {
+        expectedKey = org.apiKey;
+      }
+    }
+
     if (!expectedKey || expectedKey !== apiKey) {
       return reply.code(401).send(wrapError('UNAUTHORIZED', 'Invalid orgId or apiKey', request.id));
     }
