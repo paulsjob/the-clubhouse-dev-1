@@ -1,5 +1,5 @@
 
-import { Credential, Resource, LiveSession, Graph, Output } from '@renderless/contracts';
+import { Credential, Resource, LiveSession, Graph, Output, SchemaSnapshotV1 } from '@renderless/contracts';
 
 export interface IStore<T> {
   list(orgId: string): Promise<T[]>;
@@ -46,6 +46,11 @@ export const resourceStore = new InMemoryStore<Resource>();
 export const liveSessionStore = new InMemoryStore<LiveSession>();
 export const graphStore = new InMemoryStore<Graph>();
 export const outputStore = new InMemoryStore<Output>();
+export const schemaStore = new InMemoryStore<SchemaSnapshotV1>();
 
 // Last-known-value store for topics
 export const ephemeralStateStore = new Map<string, any>();
+
+// Quick lookup for latest schema snapshots
+export const latestOutputSchemaMap = new Map<string, string>(); // outputId -> snapshotId
+export const latestTopicSchemaMap = new Map<string, string>(); // topic -> snapshotId

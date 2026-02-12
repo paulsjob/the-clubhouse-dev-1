@@ -1,9 +1,10 @@
 
 import { FastifyPluginAsync } from 'fastify';
-import { outputStore, graphStore } from '../../services/storage';
+import { outputStore, graphStore, schemaStore, latestOutputSchemaMap } from '../../services/storage';
 import { GraphExecutor } from '../../services/graphs/executor';
+import { SchemaDeriver } from '../../services/schema/derivation';
 import { wrapSuccess, wrapError } from '../../utils/responses';
-import { OutputSchema } from '@renderless/contracts';
+import { OutputSchema, SchemaSnapshotV1 } from '@renderless/contracts';
 
 export const outputRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/v1/outputs', async (request) => {
@@ -71,5 +72,51 @@ export const outputRoutes: FastifyPluginAsync = async (fastify) => {
     } catch (e: any) {
       return reply.code(400).send(wrapError('EXECUTION_ERROR', e.message, request.id));
     }
+  });
+
+  // ITEM 08: Schema Generation
+  fastify.post('/v1/outputs/:id/schema', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { params } = (request.body as any) || {};
+
+    const output = await outputStore.get(request.rl.orgId, id);
+    if (!output) return reply.code(404).send(wrapError('NOT_FOUND', 'Output not found', request.id));
+
+    const graph = await graphStore.get(request.rl.orgId, output.graphId);
+    if (!graph) return reply.code(404).send(wrapError('NOT_FOUND', 'Graph not found', request.id));
+
+    try {
+      const execution = await GraphExecutor.run(graph, request.rl.orgId, params);
+      const fields = SchemaDeriver.derive(execution.result);
+      const hash = SchemaDeriver.generateHash(fields);
+      
+      const snapshot: SchemaSnapshotV1 = {
+        id: `schema_${Date.now()}`,
+        orgId: request.rl.orgId,
+        createdAt: Date.now(),
+        sourceType: "output_run",
+        sourceId: id,
+        fields,
+        hash
+      };
+
+      await schemaStore.create(request.rl.orgId, snapshot);
+      latestOutputSchemaMap.set(id, snapshot.id);
+
+      return wrapSuccess(snapshot, request.id);
+    } catch (e: any) {
+      return reply.code(400).send(wrapError('SCHEMA_DERIVATION_ERROR', e.message, request.id));
+    }
+  });
+
+  fastify.get('/v1/outputs/:id/schema', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const snapshotId = latestOutputSchemaMap.get(id);
+    if (!snapshotId) return reply.code(404).send(wrapError('NOT_FOUND', 'No schema recorded for this output', request.id));
+    
+    const snapshot = await schemaStore.get(request.rl.orgId, snapshotId);
+    if (!snapshot) return reply.code(404).send(wrapError('NOT_FOUND', 'Schema snapshot missing', request.id));
+
+    return wrapSuccess(snapshot, request.id);
   });
 };

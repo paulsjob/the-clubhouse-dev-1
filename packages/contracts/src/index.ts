@@ -8,6 +8,7 @@ export * from './types/graph';
 export * from './types/output';
 export * from './types/liveSession';
 export * from './types/topic';
+export * from './types/schema';
 export * from './types/domain/mlbScorebugStateV1';
 
 // Validators
@@ -17,4 +18,5 @@ export * from './validators/graph';
 export * from './validators/output';
 export * from './validators/liveSession';
 export * from './validators/topic';
+export * from './validators/schema';
 export * from './validators/domain/mlbScorebugStateV1';
