@@ -1,0 +1,13 @@
+
+{
+  "name": "renderless-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "echo 'Building Studio at root...'"
+  }
+}

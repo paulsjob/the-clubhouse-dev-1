@@ -1,0 +1,19 @@
+
+{
+  "name": "@renderless/gateway",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "ts-node src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "fastify": "^4.24.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.8.10",
+    "typescript": "^5.2.2",
+    "ts-node": "^10.9.1"
+  }
+}
