@@ -4,11 +4,17 @@ export type LiveSessionStatus = "initializing" | "active" | "stalled" | "termina
 export interface LiveSession {
   id: string;
   orgId: string;
-  outputId: string;
-  key: string;
-  params: Record<string, any>;
-  mode: string;
+  name: string;
+  resourceId: string;
+  credentialId?: string;
+  pollIntervalMs: number;
+  topics: string[];
+  path: string;
+  query?: Record<string, string>;
+  transform: string;
   status: LiveSessionStatus;
-  startedAt: number;
-  lastHeartbeatAt: number;
+  startedAt?: number;
+  lastPublishedAt?: number;
+  lastError?: string;
+  consecutiveFailures: number;
 }

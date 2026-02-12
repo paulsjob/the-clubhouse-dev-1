@@ -9,6 +9,8 @@ import { whoamiRoutes } from './routes/whoami';
 import { credentialRoutes } from './routes/v1/credentials';
 import { resourceRoutes } from './routes/v1/resources';
 import { fetchRoutes } from './routes/v1/fetch';
+import { liveSessionRoutes } from './routes/v1/live/sessions';
+import { streamRoutes } from './routes/v1/live/stream';
 
 export const buildServer = (): FastifyInstance => {
   const server = Fastify({
@@ -36,6 +38,8 @@ export const buildServer = (): FastifyInstance => {
   server.register(credentialRoutes);
   server.register(resourceRoutes);
   server.register(fetchRoutes);
+  server.register(liveSessionRoutes);
+  server.register(streamRoutes);
 
   return server;
 };
