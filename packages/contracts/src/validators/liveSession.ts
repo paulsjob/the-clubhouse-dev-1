@@ -6,7 +6,8 @@ export const LiveSessionSchema = z.object({
   orgId: z.string(),
   outputId: z.string(),
   key: z.string(),
-  params: z.record(z.any()),
+  // Fix: Zod record requires key and value schemas
+  params: z.record(z.string(), z.any()),
   mode: z.string(),
   status: z.enum(["initializing", "active", "stalled", "terminated"]),
   startedAt: z.number(),

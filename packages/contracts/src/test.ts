@@ -1,4 +1,5 @@
 
+import process from 'node:process';
 import { ResourceSchema } from './validators/resource';
 import { MLBScorebugStateV1Schema } from './validators/domain/mlbScorebugStateV1';
 import { Resource } from './types/resource';
@@ -8,7 +9,10 @@ const sampleResource: Resource = {
   id: "res_123",
   orgId: "org_456",
   name: "MLB Live Feed",
-  provider: "sportradar",
+  // Fix: Property name changed from 'provider' to 'providerHint' to match Resource interface
+  providerHint: "sportradar",
+  // Fix: Add missing required property 'baseUrl'
+  baseUrl: "https://api.example.com/mlb",
   mode: "http",
   requestTemplate: { url: "https://api.example.com/mlb" },
   paramsSchema: { gameId: "string" },

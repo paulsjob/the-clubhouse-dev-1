@@ -8,3 +8,16 @@ export interface CredentialMetadata {
   createdAt: number;
   isActive: boolean;
 }
+
+export interface CredentialSecrets {
+  apiKey?: string;
+  bearerToken?: string;
+  headerName?: string;
+  headerValue?: string;
+  queryParamName?: string;
+  queryParamValue?: string;
+}
+
+export interface Credential extends CredentialMetadata {
+  secrets: CredentialSecrets;
+}

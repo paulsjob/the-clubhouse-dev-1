@@ -1,0 +1,45 @@
+
+import { Credential, Resource } from '@renderless/contracts';
+
+export interface IStore<T> {
+  list(orgId: string): Promise<T[]>;
+  get(orgId: string, id: string): Promise<T | null>;
+  create(orgId: string, data: T): Promise<T>;
+  update(orgId: string, id: string, data: Partial<T>): Promise<T | null>;
+  delete(orgId: string, id: string): Promise<boolean>;
+}
+
+class InMemoryStore<T extends { id: string; orgId: string }> implements IStore<T> {
+  private items: Map<string, T> = new Map();
+
+  async list(orgId: string): Promise<T[]> {
+    return Array.from(this.items.values()).filter(i => i.orgId === orgId);
+  }
+
+  async get(orgId: string, id: string): Promise<T | null> {
+    const item = this.items.get(id);
+    return item && item.orgId === orgId ? item : null;
+  }
+
+  async create(orgId: string, data: T): Promise<T> {
+    this.items.set(data.id, data);
+    return data;
+  }
+
+  async update(orgId: string, id: string, data: Partial<T>): Promise<T | null> {
+    const existing = await this.get(orgId, id);
+    if (!existing) return null;
+    const updated = { ...existing, ...data };
+    this.items.set(id, updated);
+    return updated;
+  }
+
+  async delete(orgId: string, id: string): Promise<boolean> {
+    const existing = await this.get(orgId, id);
+    if (!existing) return false;
+    return this.items.delete(id);
+  }
+}
+
+export const credentialStore = new InMemoryStore<Credential>();
+export const resourceStore = new InMemoryStore<Resource>();

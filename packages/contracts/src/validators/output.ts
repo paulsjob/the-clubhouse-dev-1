@@ -7,6 +7,7 @@ export const OutputSchema = z.object({
   name: z.string(),
   graphId: z.string(),
   type: z.enum(["endpoint", "topic"]),
-  config: z.record(z.any()),
+  // Fix: Zod record requires key and value schemas
+  config: z.record(z.string(), z.any()),
   isActive: z.boolean(),
 });

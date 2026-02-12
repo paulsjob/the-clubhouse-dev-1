@@ -1,10 +1,12 @@
+
 import { FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
 import { config } from '../config';
 import { wrapError } from '../utils/responses';
 
 declare module 'fastify' {
-  interface FastifyRequest {
+  // Fix: Augmentation must match original FastifyRequest type parameters to avoid "identical type parameters" error
+  interface FastifyRequest<RouteGeneric, RawServer, RawRequest, SchemaCompiler, TypeProvider, ContextConfig, Logger> {
     rl: {
       orgId: string;
       authType: 'apiKey';

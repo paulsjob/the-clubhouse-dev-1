@@ -5,7 +5,8 @@ export interface Resource {
   id: string;
   orgId: string;
   name: string;
-  provider: string;
+  baseUrl: string;
+  providerHint?: string;
   mode: ResourceMode;
   requestTemplate: Record<string, any>;
   paramsSchema: Record<string, any>;
@@ -13,4 +14,5 @@ export interface Resource {
   samples?: any[];
   inferredSchema?: Record<string, any>;
   isActive: boolean;
+  defaultHeaders?: Record<string, string>;
 }

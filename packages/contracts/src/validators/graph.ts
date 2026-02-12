@@ -11,7 +11,8 @@ export const EdgeSchema = z.object({
 export const NodeSchema = z.object({
   id: z.string(),
   type: z.string(),
-  config: z.record(z.any()),
+  // Fix: Zod record requires key and value schemas
+  config: z.record(z.string(), z.any()),
   inputs: z.array(z.string()).optional(),
   outputs: z.array(z.string()).optional(),
 });
@@ -21,7 +22,8 @@ export const GraphSchema = z.object({
   orgId: z.string(),
   name: z.string(),
   version: z.string(),
-  paramsSchema: z.record(z.any()),
+  // Fix: Zod record requires key and value schemas
+  paramsSchema: z.record(z.string(), z.any()),
   nodes: z.array(NodeSchema),
   edges: z.array(EdgeSchema),
 });

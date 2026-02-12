@@ -1,3 +1,4 @@
+
 import Fastify, { FastifyInstance } from 'fastify';
 import { config } from './config';
 import corsPlugin from './plugins/cors';
@@ -5,6 +6,9 @@ import authPlugin from './plugins/auth';
 import rateLimitPlugin from './plugins/rateLimit';
 import { healthRoutes } from './routes/health';
 import { whoamiRoutes } from './routes/whoami';
+import { credentialRoutes } from './routes/v1/credentials';
+import { resourceRoutes } from './routes/v1/resources';
+import { fetchRoutes } from './routes/v1/fetch';
 
 export const buildServer = (): FastifyInstance => {
   const server = Fastify({
@@ -29,6 +33,9 @@ export const buildServer = (): FastifyInstance => {
   // Register Routes
   server.register(healthRoutes);
   server.register(whoamiRoutes);
+  server.register(credentialRoutes);
+  server.register(resourceRoutes);
+  server.register(fetchRoutes);
 
   return server;
 };
