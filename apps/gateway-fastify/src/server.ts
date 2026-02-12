@@ -1,7 +1,10 @@
 import Fastify, { FastifyInstance } from 'fastify';
-import process from 'node:process';
 import { config } from './config';
-import pkg from '../package.json';
+import corsPlugin from './plugins/cors';
+import authPlugin from './plugins/auth';
+import rateLimitPlugin from './plugins/rateLimit';
+import { healthRoutes } from './routes/health';
+import { whoamiRoutes } from './routes/whoami';
 
 export const buildServer = (): FastifyInstance => {
   const server = Fastify({
@@ -13,18 +16,19 @@ export const buildServer = (): FastifyInstance => {
           ignore: 'pid,hostname',
         },
       },
-    } : true
+    } : true,
+    // Use Fastify's built-in request ID generator
+    requestIdHeader: 'x-request-id',
   });
 
-  server.get('/health', async () => {
-    return {
-      ok: true,
-      service: "gateway",
-      version: pkg.version,
-      uptimeSec: Math.floor(process.uptime()),
-      ts: Date.now()
-    };
-  });
+  // Register Plugins
+  server.register(corsPlugin);
+  server.register(authPlugin);
+  server.register(rateLimitPlugin);
+
+  // Register Routes
+  server.register(healthRoutes);
+  server.register(whoamiRoutes);
 
   return server;
 };
