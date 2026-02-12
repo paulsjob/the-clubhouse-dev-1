@@ -1,4 +1,7 @@
+
 import process from 'node:process';
+import os from 'node:os';
+import path from 'node:path';
 
 export interface AppConfig {
   port: number;
@@ -7,6 +10,10 @@ export interface AppConfig {
   corsOrigins: string[];
   rateLimitMax: number;
   rateLimitWindowMs: number;
+  // ITEM 10: Persistence
+  persistEnabled: boolean;
+  persistDir: string;
+  persistIncludeSecrets: boolean;
 }
 
 const parseOrgKeys = (json?: string): Record<string, string> => {
@@ -30,11 +37,17 @@ const parseCorsOrigins = (str?: string): string[] => {
   return str.split(',').map(s => s.trim());
 };
 
+const nodeEnv = (process.env.NODE_ENV as any) || 'development';
+
 export const config: AppConfig = {
   port: parseInt(process.env.PORT || '8787', 10),
-  nodeEnv: (process.env.NODE_ENV as any) || 'development',
+  nodeEnv,
   orgKeys: parseOrgKeys(process.env.GATEWAY_ORG_KEYS_JSON),
   corsOrigins: parseCorsOrigins(process.env.CORS_ORIGINS),
   rateLimitMax: parseInt(process.env.RATE_LIMIT_MAX || '120', 10),
   rateLimitWindowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10),
+  // ITEM 10: Defaults
+  persistEnabled: process.env.PERSIST_ENABLED ? process.env.PERSIST_ENABLED === 'true' : nodeEnv !== 'production',
+  persistDir: process.env.PERSIST_DIR || path.join(os.tmpdir(), 'rl-gateway-store'),
+  persistIncludeSecrets: nodeEnv === 'production' ? false : process.env.PERSIST_INCLUDE_SECRETS === 'true',
 };
