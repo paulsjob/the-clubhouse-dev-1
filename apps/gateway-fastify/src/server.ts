@@ -11,6 +11,8 @@ import { resourceRoutes } from './routes/v1/resources';
 import { fetchRoutes } from './routes/v1/fetch';
 import { liveSessionRoutes } from './routes/v1/live/sessions';
 import { streamRoutes } from './routes/v1/live/stream';
+import { graphRoutes } from './routes/v1/graphs';
+import { outputRoutes } from './routes/v1/outputs';
 
 export const buildServer = (): FastifyInstance => {
   const server = Fastify({
@@ -40,6 +42,8 @@ export const buildServer = (): FastifyInstance => {
   server.register(fetchRoutes);
   server.register(liveSessionRoutes);
   server.register(streamRoutes);
+  server.register(graphRoutes);
+  server.register(outputRoutes);
 
   return server;
 };

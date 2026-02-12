@@ -1,5 +1,5 @@
 
-import { Credential, Resource, LiveSession } from '@renderless/contracts';
+import { Credential, Resource, LiveSession, Graph, Output } from '@renderless/contracts';
 
 export interface IStore<T> {
   list(orgId: string): Promise<T[]>;
@@ -44,6 +44,8 @@ class InMemoryStore<T extends { id: string; orgId: string }> implements IStore<T
 export const credentialStore = new InMemoryStore<Credential>();
 export const resourceStore = new InMemoryStore<Resource>();
 export const liveSessionStore = new InMemoryStore<LiveSession>();
+export const graphStore = new InMemoryStore<Graph>();
+export const outputStore = new InMemoryStore<Output>();
 
 // Last-known-value store for topics
 export const ephemeralStateStore = new Map<string, any>();
