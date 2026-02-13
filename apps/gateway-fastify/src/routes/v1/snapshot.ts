@@ -7,61 +7,66 @@ import { config } from '../../config';
 
 export const snapshotRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get(
-    '/v1/snapshot/export',
-    {
-      schema: {
-        tags: ['Snapshot'],
-        summary: 'Export organization snapshot',
-        description: 'Returns a complete backup of organization resources, including the organization definition itself.',
-        querystring: {
-          type: 'object',
-          properties: { includeSecrets: { type: 'boolean', default: false } },
+  '/v1/snapshot/export',
+  {
+    schema: {
+      tags: ['Snapshot'],
+      summary: 'Export organization snapshot',
+      description: 'Returns a complete backup of organization resources.',
+      querystring: {
+        type: 'object',
+        properties: {
+          includeSecrets: { type: 'boolean', default: false },
         },
-      } as any,
-    },
-    async (request, reply) => {
-      const q = request.query as any;
-      const includeSecrets =
-        q?.includeSecrets === true || q?.includeSecrets === 'true';
+      },
+    } as any,
+  },
+  async (request, reply) => {
+    const orgId = request.rl.orgId;
 
-      const orgId = request.rl.orgId;
+    // Parse includeSecrets safely (supports ?includeSecrets=true or actual boolean)
+    const q = (request.query ?? {}) as any;
+    const includeSecrets: boolean =
+      q.includeSecrets === true || q.includeSecrets === 'true';
 
-      if (includeSecrets && config.nodeEnv === 'production') {
-        return reply
-          .code(403)
-          .send(
-            wrapError(
-              'FORBIDDEN',
-              'Exporting secrets is prohibited in production environment',
-              request.id
-            )
-          );
-      }
-
-      try {
-        const snapshot = await exportOrgSnapshot(orgId, includeSecrets);
-
-        if (includeSecrets) {
-          fastify.log.warn(
-            { orgId, requestId: request.id },
-            'Org snapshot exported WITH secrets'
-          );
-        }
-
-        return wrapSuccess(
-          {
-            version: CONTRACTS_VERSION,
-            generatedAt: Date.now(),
-            orgId,
-            snapshot,
-          },
-          request.id
+    if (includeSecrets && config.nodeEnv === 'production') {
+      return reply
+        .code(403)
+        .send(
+          wrapError(
+            'FORBIDDEN',
+            'Exporting secrets is prohibited in production environment',
+            request.id
+          )
         );
-      } catch (e: any) {
-        return reply.code(500).send(wrapError('EXPORT_FAILED', e.message, request.id));
-      }
     }
-  );
+
+    try {
+      const snapshot = await exportOrgSnapshot(orgId, includeSecrets);
+
+      if (includeSecrets) {
+        fastify.log.warn(
+          { orgId, requestId: request.id },
+          'Org snapshot exported WITH secrets'
+        );
+      }
+
+      return wrapSuccess(
+        {
+          version: CONTRACTS_VERSION,
+          generatedAt: Date.now(),
+          orgId,
+          snapshot,
+        },
+        request.id
+      );
+    } catch (e: any) {
+      return reply
+        .code(500)
+        .send(wrapError('EXPORT_FAILED', e?.message ?? 'Unknown error', request.id));
+    }
+  }
+);
 
   fastify.post('/v1/snapshot/import', {
     schema: {
