@@ -57,8 +57,6 @@ class InMemoryStore<T extends { id: string; orgId: string }> implements IStore<T
     PersistenceManager.markDirty(orgId);
   }
 
-  // ITEM 12: Special method for global resources like Organizations
-  // In a real DB these would be in a different table, but here we can reuse the store.
   async getAllGlobal(): Promise<T[]> {
     return Array.from(this.items.values());
   }
@@ -76,17 +74,16 @@ export const outputStore = new InMemoryStore<Output>();
 export const schemaStore = new InMemoryStore<SchemaSnapshotV1>();
 
 // ITEM 12: Organization Store
-// We cast to any to reuse the orgId in the T constraint, although for Orgs, orgId is redundant with id.
 export const orgStore = new InMemoryStore<Organization & { orgId: string }>();
 
 // Last-known-value store for topics
 export const ephemeralStateStore = new Map<string, any>();
 
 // Quick lookup for latest schema snapshots
-export const latestOutputSchemaMap = new Map<string, string>(); // outputId -> snapshotId
-export const latestTopicSchemaMap = new Map<string, string>(); // topic -> snapshotId
+export const latestOutputSchemaMap = new Map<string, string>(); 
+export const latestTopicSchemaMap = new Map<string, string>();
 
-// ITEM 09: Snapshot Helpers
+// ITEM 09 / 13: Snapshot Helpers
 export async function exportOrgSnapshot(orgId: string, includeSecrets: boolean): Promise<SnapshotV1> {
   const [credentials, resources, graphs, outputs, liveSessions, schemas] = await Promise.all([
     credentialStore.list(orgId),
@@ -97,13 +94,17 @@ export async function exportOrgSnapshot(orgId: string, includeSecrets: boolean):
     schemaStore.list(orgId),
   ]);
 
+  const organizations = await orgStore.getAllGlobal();
+  const relevantOrgs = organizations.filter(o => o.id === orgId);
+
   return {
     credentials: includeSecrets ? credentials : credentials.map(c => ({ ...c, secrets: {} })),
     resources,
     graphs,
     outputs,
     liveSessions,
-    schemas
+    schemas,
+    organizations: relevantOrgs.length > 0 ? relevantOrgs : undefined
   };
 }
 
@@ -119,7 +120,7 @@ export async function importOrgSnapshot(orgId: string, snapshot: SnapshotV1, mod
     ]);
   }
 
-  const tasks = [
+  const tasks: Promise<any>[] = [
     ...snapshot.credentials.map(item => credentialStore.create(orgId, { ...item, orgId })),
     ...snapshot.resources.map(item => resourceStore.create(orgId, { ...item, orgId })),
     ...snapshot.graphs.map(item => graphStore.create(orgId, { ...item, orgId })),
@@ -128,40 +129,65 @@ export async function importOrgSnapshot(orgId: string, snapshot: SnapshotV1, mod
     ...snapshot.schemas.map(item => schemaStore.create(orgId, { ...item, orgId })),
   ];
 
+  if (snapshot.organizations) {
+    tasks.push(...snapshot.organizations.map(item => orgStore.create(item.id, { ...item, orgId: item.id })));
+  }
+
   await Promise.all(tasks);
 }
 
-// ITEM 10: Persistence Manager
+// ITEM 10 / 13: Persistence Manager
 export class PersistenceManager {
   private static saveTimers: Map<string, NodeJS.Timeout> = new Map();
+  private static SYSTEM_ID = '_system'; // Special ID for global metadata like orgs
 
   static markDirty(orgId: string) {
     if (!config.persistEnabled) return;
     
-    if (this.saveTimers.has(orgId)) {
-      clearTimeout(this.saveTimers.get(orgId)!);
+    // If it's an org record, we also mark the system dirty
+    const targetId = orgId === PersistenceManager.SYSTEM_ID ? orgId : orgId;
+    
+    if (this.saveTimers.has(targetId)) {
+      clearTimeout(this.saveTimers.get(targetId)!);
     }
 
     const timer = setTimeout(() => {
-      this.saveOrg(orgId);
+      this.saveOrg(targetId);
     }, 500);
 
-    this.saveTimers.set(orgId, timer);
+    this.saveTimers.set(targetId, timer);
   }
 
-  private static async saveOrg(orgId: string) {
-    this.saveTimers.delete(orgId);
+  private static async saveOrg(targetId: string) {
+    this.saveTimers.delete(targetId);
     
     try {
-      const snapshot = await exportOrgSnapshot(orgId, config.persistIncludeSecrets);
-      const filePath = path.join(config.persistDir, `${orgId}.json`);
+      let data: SnapshotV1;
+      
+      if (targetId === PersistenceManager.SYSTEM_ID) {
+        // Special case: save all organizations globally
+        const organizations = await orgStore.getAllGlobal();
+        data = {
+          credentials: [],
+          resources: [],
+          graphs: [],
+          outputs: [],
+          liveSessions: [],
+          schemas: [],
+          organizations
+        };
+      } else {
+        data = await exportOrgSnapshot(targetId, config.persistIncludeSecrets);
+      }
+
+      const filePath = path.join(config.persistDir, `${targetId}.json`);
       const tmpPath = `${filePath}.tmp`;
 
       await fs.mkdir(config.persistDir, { recursive: true });
-      await fs.writeFile(tmpPath, JSON.stringify(snapshot, null, 2), 'utf8');
+      await fs.writeFile(tmpPath, JSON.stringify(data, null, 2), 'utf8');
       await fs.rename(tmpPath, filePath);
     } catch (err) {
-      console.error(`❌ Persistence: Failed to save org ${orgId}`, err);
+      console.error(`❌ Persistence: Failed to save ${targetId}`, err);
     }
   }
 
@@ -173,10 +199,10 @@ export class PersistenceManager {
       const files = await fs.readdir(config.persistDir);
       const orgFiles = files.filter(f => f.endsWith('.json'));
 
-      console.info(`💾 Persistence: Found ${orgFiles.length} org snapshots. Loading...`);
+      console.info(`💾 Persistence: Found ${orgFiles.length} persistence files. Loading...`);
 
       for (const file of orgFiles) {
-        const orgId = path.basename(file, '.json');
+        const targetId = path.basename(file, '.json');
         const filePath = path.join(config.persistDir, file);
         
         try {
@@ -185,7 +211,15 @@ export class PersistenceManager {
           
           const originalPersist = config.persistEnabled;
           (config as any).persistEnabled = false;
-          await importOrgSnapshot(orgId, snapshot, 'merge');
+
+          if (targetId === PersistenceManager.SYSTEM_ID && snapshot.organizations) {
+             for (const org of snapshot.organizations) {
+               await orgStore.create(org.id, { ...org, orgId: org.id });
+             }
+          } else {
+            await importOrgSnapshot(targetId, snapshot, 'merge');
+          }
+
           (config as any).persistEnabled = originalPersist;
         } catch (loadErr) {
           console.error(`❌ Persistence: Failed to load ${file}`, loadErr);

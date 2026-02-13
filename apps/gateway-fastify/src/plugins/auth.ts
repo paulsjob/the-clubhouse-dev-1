@@ -21,8 +21,8 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
       return;
     }
 
-    // ITEM 12: Organization management endpoints bypass tenant auth
-    // These will use their own preHandler for x-rl-admin-key
+    // ITEM 12/13: Organization management endpoints bypass tenant auth
+    // These use their own preHandler for x-rl-admin-key in orgs.ts
     if (request.url.startsWith('/v1/orgs')) {
       return;
     }
@@ -34,15 +34,17 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
       return reply.code(401).send(wrapError('UNAUTHORIZED', 'Missing auth headers', request.id));
     }
 
-    // Check static config first (backward compatibility)
-    let expectedKey = config.orgKeys[orgId];
-    
-    // If not in static config, check dynamic orgStore
+    // ITEM 13: Precedence - Dynamic orgStore wins over static config.orgKeys
+    let expectedKey: string | undefined;
+
+    const org = await orgStore.getById(orgId);
+    if (org && org.isActive) {
+      expectedKey = org.apiKey;
+    }
+
+    // Fallback to static config (for dev/env bootstrap)
     if (!expectedKey) {
-      const org = await orgStore.getById(orgId);
-      if (org && org.isActive) {
-        expectedKey = org.apiKey;
-      }
+      expectedKey = config.orgKeys[orgId];
     }
 
     if (!expectedKey || expectedKey !== apiKey) {

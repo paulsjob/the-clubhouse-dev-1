@@ -5,6 +5,7 @@ import { Graph } from './graph';
 import { Output } from './output';
 import { LiveSession } from './liveSession';
 import { SchemaSnapshotV1 } from './schema';
+import { Organization } from './org';
 
 export interface SnapshotV1 {
   credentials: Credential[];
@@ -13,6 +14,7 @@ export interface SnapshotV1 {
   outputs: Output[];
   liveSessions: LiveSession[];
   schemas: SchemaSnapshotV1[];
+  organizations?: Organization[]; // Added in Item 13
 }
 
 export interface SnapshotExportV1 {

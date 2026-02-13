@@ -12,7 +12,7 @@ export const snapshotRoutes: FastifyPluginAsync = async (fastify) => {
       schema: {
         tags: ['Snapshot'],
         summary: 'Export organization snapshot',
-        description: 'Returns a complete backup of organization resources.',
+        description: 'Returns a complete backup of organization resources, including the organization definition itself.',
         querystring: {
           type: 'object',
           properties: { includeSecrets: { type: 'boolean', default: false } },
@@ -62,14 +62,12 @@ export const snapshotRoutes: FastifyPluginAsync = async (fastify) => {
       }
     }
   );
-};
-
 
   fastify.post('/v1/snapshot/import', {
     schema: {
       tags: ['Snapshot'],
       summary: 'Import organization snapshot',
-      description: 'Restore organization resources from a previous export.',
+      description: 'Restore organization resources and metadata from a previous export.',
       body: {
         type: 'object',
         required: ['mode', 'snapshot'],
@@ -106,6 +104,7 @@ export const snapshotRoutes: FastifyPluginAsync = async (fastify) => {
           outputs: snapshot.outputs.length,
           liveSessions: snapshot.liveSessions.length,
           schemas: snapshot.schemas.length,
+          organizations: snapshot.organizations?.length ?? 0
         }
       }, request.id);
     } catch (e: any) {

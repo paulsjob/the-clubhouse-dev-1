@@ -6,6 +6,7 @@ import { GraphSchema } from './graph';
 import { OutputSchema } from './output';
 import { LiveSessionSchema } from './liveSession';
 import { SchemaSnapshotV1Schema } from './schema';
+import { OrganizationSchema } from './org';
 
 export const SnapshotV1Schema = z.object({
   credentials: z.array(CredentialSchema),
@@ -14,6 +15,7 @@ export const SnapshotV1Schema = z.object({
   outputs: z.array(OutputSchema),
   liveSessions: z.array(LiveSessionSchema),
   schemas: z.array(SchemaSnapshotV1Schema),
+  organizations: z.array(OrganizationSchema).optional(), // Added in Item 13
 });
 
 export const SnapshotExportV1Schema = z.object({
