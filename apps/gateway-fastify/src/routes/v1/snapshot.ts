@@ -6,41 +6,64 @@ import { SnapshotImportV1Schema, CONTRACTS_VERSION } from '@renderless/contracts
 import { config } from '../../config';
 
 export const snapshotRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.get('/v1/snapshot/export', {
-    schema: {
-      tags: ['Snapshot'],
-      summary: 'Export organization snapshot',
-      description: 'Returns a complete backup of organization resources.',
-      querystring: {
-        type: 'object',
-        properties: { includeSecrets: { type: 'boolean', default: false } }
+  fastify.get(
+    '/v1/snapshot/export',
+    {
+      schema: {
+        tags: ['Snapshot'],
+        summary: 'Export organization snapshot',
+        description: 'Returns a complete backup of organization resources.',
+        querystring: {
+          type: 'object',
+          properties: { includeSecrets: { type: 'boolean', default: false } },
+        },
+      } as any,
+    },
+    async (request, reply) => {
+      const q = request.query as any;
+      const includeSecrets =
+        q?.includeSecrets === true || q?.includeSecrets === 'true';
+
+      const orgId = request.rl.orgId;
+
+      if (includeSecrets && config.nodeEnv === 'production') {
+        return reply
+          .code(403)
+          .send(
+            wrapError(
+              'FORBIDDEN',
+              'Exporting secrets is prohibited in production environment',
+              request.id
+            )
+          );
       }
-    } as any
-  }, async (request, reply) => {
-    const includeSecrets = request.query && (request.query as any).includeSecrets === 'true';
-    const orgId = request.rl.orgId;
 
-    if (includeSecrets && config.nodeEnv === 'production') {
-      return reply.code(403).send(wrapError('FORBIDDEN', 'Exporting secrets is prohibited in production environment', request.id));
-    }
+      try {
+        const snapshot = await exportOrgSnapshot(orgId, includeSecrets);
 
-    try {
-      const snapshot = await exportOrgSnapshot(orgId, includeSecrets);
-      
-      if (includeSecrets) {
-        fastify.log.warn({ orgId, requestId: request.id }, 'Org snapshot exported WITH secrets');
+        if (includeSecrets) {
+          fastify.log.warn(
+            { orgId, requestId: request.id },
+            'Org snapshot exported WITH secrets'
+          );
+        }
+
+        return wrapSuccess(
+          {
+            version: CONTRACTS_VERSION,
+            generatedAt: Date.now(),
+            orgId,
+            snapshot,
+          },
+          request.id
+        );
+      } catch (e: any) {
+        return reply.code(500).send(wrapError('EXPORT_FAILED', e.message, request.id));
       }
-
-      return wrapSuccess({
-        version: CONTRACTS_VERSION,
-        generatedAt: Date.now(),
-        orgId,
-        snapshot
-      }, request.id);
-    } catch (e: any) {
-      return reply.code(500).send(wrapError('EXPORT_FAILED', e.message, request.id));
     }
-  });
+  );
+};
+
 
   fastify.post('/v1/snapshot/import', {
     schema: {
