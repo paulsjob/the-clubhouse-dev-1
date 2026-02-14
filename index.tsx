@@ -146,9 +146,11 @@ const StudioApp = () => {
   const [showSafeZones, setShowSafeZones] = useState(true);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   
+  // ITEM 26: Follow Mode State
   const [followActive, setFollowActive] = useState(false);
   const [followEvents, setFollowEvents] = useState<any[]>([]);
 
+  // ITEM 24: Resizable Inspector State
   const [inspectorWidth, setInspectorWidth] = useState(() => {
     const saved = localStorage.getItem('rl-inspector-width');
     return saved ? parseInt(saved, 10) : 320;
@@ -259,10 +261,12 @@ const StudioApp = () => {
 
   const effectiveTool = useMemo(() => isSpacePressed ? 'hand' : tool, [isSpacePressed, tool]);
 
+  // ITEM 26: Follow Mode Activation
   const handleFollowData = async () => {
     setFollowActive(true);
     setFollowEvents([]);
     
+    // Wire SSE listener for the debug topic
     const eventSource = new EventSource('/v1/live/stream/debug.follow.*');
     eventSource.onmessage = (e) => {
       const payload = JSON.parse(e.data);
@@ -282,6 +286,7 @@ const StudioApp = () => {
     }
   };
 
+  // ITEM 24: Resizing Logic
   const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     const startX = e.clientX;
@@ -480,6 +485,12 @@ const StudioApp = () => {
                     <button onClick={(e) => { e.stopPropagation(); reorderElement(el.id, 'down'); }} disabled={i === layout.elements.length - 1} className="text-zinc-600 hover:text-white disabled:opacity-0"><svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4"><path d="m6 9 6 6 6-6"/></svg></button>
                   </div>
                   <p className={`text-[10px] font-black uppercase truncate flex-1 ${selectedIds.includes(el.id) ? 'text-white' : 'text-zinc-400'}`}>{el.name || el.type}</p>
+                  <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={(e) => { e.stopPropagation(); updateElement(el.id, { visible: !el.visible }); }} className={`p-1 hover:text-white ${el.visible ? 'text-zinc-500' : 'text-blue-500'}`}>
+                      {el.visible ? <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg> : <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.52 13.52 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>}
+                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); deleteElement(el.id); }} className="p-1 text-zinc-500 hover:text-red-500"><svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -512,6 +523,17 @@ const StudioApp = () => {
             disableInteraction={effectiveTool === 'hand'} 
           />
         </div>
+        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 px-8 py-4 bg-zinc-900/90 backdrop-blur-3xl rounded-full border border-zinc-800 flex items-center gap-10 text-[9px] font-black uppercase text-zinc-500 shadow-2xl z-50">
+          <div className="flex items-center gap-3 text-white"><span className="opacity-30">Zoom</span><span className="font-mono text-[10px]">{Math.round(scale * 100)}%</span></div>
+          <div className="w-px h-5 bg-zinc-800" />
+          <div className="flex gap-8">
+            <button onClick={() => setShowGrid(!showGrid)} className={`hover:text-zinc-300 transition-colors ${showGrid ? 'text-blue-400 font-bold' : ''}`}>Grid</button>
+            <button onClick={() => setshowRulers(!showRulers)} className={`hover:text-zinc-300 transition-colors ${showRulers ? 'text-blue-400 font-bold' : ''}`}>Rulers</button>
+            <button onClick={() => setShowSafeZones(!showSafeZones)} className={`hover:text-zinc-300 transition-colors ${showSafeZones ? 'text-blue-400 font-bold' : ''}`}>Safe</button>
+            <button onClick={() => setSnapEnabled(!snapEnabled)} className={`hover:text-zinc-300 transition-colors ${snapEnabled ? 'text-blue-400 font-bold' : ''}`}>Snap</button>
+            <button onClick={handleFit} className="text-blue-500 font-black hover:text-blue-400 transition-colors">Fit View</button>
+          </div>
+        </div>
       </div>
 
       <div 
@@ -531,6 +553,13 @@ const StudioApp = () => {
 
               {selectedElements[0].type === 'text' && (
                 <>
+                  <div className="space-y-3" onPointerDown={(e) => e.stopPropagation()}>
+                    <label className="text-[9px] font-black uppercase text-zinc-500 tracking-widest px-1">Type Setting</label>
+                    <div className="grid grid-cols-2 gap-2 p-1 bg-black rounded-xl border border-zinc-800">
+                      <button onClick={() => { commitToHistory(); updateElement(selectedElements[0].id, { data: { ...selectedElements[0].data, textType: 'point' } }); }} className={`py-2 rounded-lg text-[10px] font-black uppercase transition-all ${selectedElements[0].data?.textType === 'point' ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}>Point</button>
+                      <button onClick={() => { commitToHistory(); updateElement(selectedElements[0].id, { data: { ...selectedElements[0].data, textType: 'area' } }); }} className={`py-2 rounded-lg text-[10px] font-black uppercase transition-all ${selectedElements[0].data?.textType === 'area' ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}>Area</button>
+                    </div>
+                  </div>
                   <div className="space-y-2" onPointerDown={(e) => e.stopPropagation()}>
                     <label className="text-[9px] font-black uppercase text-zinc-500 tracking-widest px-1">Text Content</label>
                     <textarea value={selectedElements[0].data?.text || ''} onChange={(e) => updateElement(selectedElements[0].id, { data: { ...selectedElements[0].data, text: e.target.value } })} onBlur={() => commitToHistory()} className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-[11px] font-bold text-zinc-300 focus:border-blue-500/50 outline-none min-h-[100px] transition-all pointer-events-auto resize-none" />
@@ -545,6 +574,34 @@ const StudioApp = () => {
                   updateElement(selectedElements[0].id, { style: { ...selectedElements[0].style, opacity: Math.min(Math.max(num / 100, 0), 1) } });
                 }} onCommit={commitToHistory} />
                 <ColorSwatch label="Fill Layer" color={selectedElements[0].style?.backgroundColor as string} onChange={(v) => updateElement(selectedElements[0].id, { style: { ...selectedElements[0].style, backgroundColor: v } })} onCommit={commitToHistory} />
+              </div>
+
+              <div className="space-y-3 pt-4 border-t border-zinc-800/50">
+                <div className="flex items-center justify-between px-1">
+                  <label className="text-[9px] font-black uppercase text-zinc-500 tracking-widest">Live Bus Monitor</label>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.4)]" />
+                    <span className="text-[8px] font-mono text-green-500 uppercase tracking-tighter">Connected</span>
+                  </div>
+                </div>
+                <div className="bg-black/60 rounded-2xl border border-zinc-800/80 overflow-hidden shadow-xl">
+                  <div className="p-3 border-b border-zinc-800/50 flex items-center justify-between bg-zinc-900/40">
+                    <span className="text-[9px] font-mono text-blue-400">mlb.game.sim</span>
+                    <span className="text-[8px] font-mono text-zinc-600 uppercase">SEQ: 1.04k</span>
+                  </div>
+                  <div className="p-4 h-32 overflow-y-auto custom-scrollbar bg-black/30">
+                    <pre className="text-[9px] font-mono text-zinc-500 leading-relaxed">
+{`{
+  "home": { "runs": 5 },
+  "away": { "runs": 3 },
+  "inning": 8,
+  "half": "top",
+  "outs": 2,
+  "count": { "b": 2, "s": 1 }
+}`}
+                    </pre>
+                  </div>
+                </div>
               </div>
             </div>
           ) : (
@@ -562,236 +619,77 @@ const StudioApp = () => {
   );
 };
 
-// --- ITEM 28: DATA ENGINE APP (GROUND TRUTH PLAYGROUND) ---
+// --- ITEM 27: DATA ENGINE APP (HEARTBEAT) ---
 const DataEngineAppImpl: React.FC = () => {
-  const [playgroundOn, setPlaygroundOn] = useState(true);
-  const [isExecuting, setIsExecuting] = useState(false);
-  const [activeStep, setActiveStep] = useState<string | null>(null);
-  const [trace, setTrace] = useState<Array<{ id: string, label: string, desc: string, time: number }>>([]);
-  const [payloads, setPayloads] = useState<Record<string, any>>({});
-  const [inspectorTab, setInspectorTab] = useState('input');
-  const [inspectorWidth, setInspectorWidth] = useState(400);
+  const [testResult, setTestResult] = useState<any | null>(null);
+  const [isRunning, setIsRunning] = useState(false);
 
-  const resizeRef = useRef<HTMLDivElement>(null);
-
-  const handleResize = useCallback((e: MouseEvent) => {
-    const newWidth = window.innerWidth - e.clientX;
-    setInspectorWidth(Math.min(Math.max(newWidth, 300), 800));
-  }, []);
-
-  const stopResize = useCallback(() => {
-    document.removeEventListener('mousemove', handleResize);
-    document.removeEventListener('mouseup', stopResize);
-  }, [handleResize]);
-
-  const startResize = useCallback(() => {
-    document.addEventListener('mousemove', handleResize);
-    document.addEventListener('mouseup', stopResize);
-  }, [handleResize, stopResize]);
-
-  const runEngine = async () => {
-    setIsExecuting(true);
-    setTrace([]);
-    setPayloads({});
-    setActiveStep(null);
-
-    const steps = [
-      { id: 'input', label: 'Input Node', type: 'EMIT' },
-      { id: 'transform', label: 'Transform Node', type: 'MAP' },
-      { id: 'validate', label: 'Validate Node', type: 'CHECK' },
-      { id: 'output', label: 'Output Node', type: 'FINAL' }
-    ];
-
-    const rawInput = {
-      "home": { "team": "Seattle", "score": 24 },
-      "away": { "team": "San Francisco", "score": 21 },
-      "clock": "02:45",
-      "quarter": 4
-    };
-
-    for (const step of steps) {
-      setActiveStep(step.id);
-      const start = performance.now();
-      await new Promise(r => setTimeout(r, 600)); // Visible pacing
-      
-      let outPayload: any;
-      let desc = "";
-
-      if (step.id === 'input') {
-        outPayload = rawInput;
-        desc = "emitted raw payload";
-      } else if (step.id === 'transform') {
-        outPayload = {
-          "headline": `${rawInput.home.team} leads ${rawInput.away.team}`,
-          "scoreline": `${rawInput.home.score} – ${rawInput.away.score}`,
-          "time": `Q${rawInput.quarter} ${rawInput.clock}`
-        };
-        desc = "mapped schema fields";
-      } else if (step.id === 'validate') {
-        outPayload = { status: "PASS", message: "Schema constraints satisfied" };
-        desc = "passed validation";
-      } else {
-        outPayload = payloads['transform']; // Use transform output for final
-        desc = "broadcast complete";
-      }
-
-      const duration = Math.round(performance.now() - start - 600); // Exclude artificial delay
-      
-      setPayloads(prev => ({ ...prev, [step.id]: outPayload }));
-      setTrace(prev => [...prev, { id: step.id, label: step.label, desc, time: duration }]);
-      setInspectorTab(step.id);
+  const runTestGraph = async () => {
+    setIsRunning(true);
+    try {
+      const response = await fetch('/v1/demo/hello-data-engine', {
+        method: 'POST',
+        headers: { 'x-rl-org-id': 'org_demo', 'x-rl-api-key': 'devkey_123' }
+      });
+      const res = await response.json();
+      if (res.ok) setTestResult(res.data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsRunning(false);
     }
-
-    setIsExecuting(false);
-    setActiveStep(null);
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-[#050506] overflow-hidden animate-in fade-in duration-500">
-      {/* PLAYGROUND HEADER */}
-      <div className="h-16 border-b border-zinc-800 flex items-center justify-between px-8 bg-zinc-900/40 shrink-0">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-3 px-3 py-1.5 bg-blue-600/10 border border-blue-500/30 rounded-lg">
-            <div className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]" />
-            <span className="text-[10px] font-black uppercase text-blue-400 tracking-widest">Engine Playground (Local)</span>
-          </div>
-          <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest italic opacity-60">
-            Click Run Engine. Watch the data move left to right. This is the heart of Renderless.
-          </p>
-        </div>
-        <button 
-          onClick={runEngine}
-          disabled={isExecuting}
-          className="px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-black uppercase rounded-xl transition-all shadow-xl shadow-blue-600/20 flex items-center gap-3 disabled:opacity-40"
-        >
-          {isExecuting ? <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin" /> : <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>}
-          Run Engine
-        </button>
+    <div className="flex-1 flex flex-col bg-[#050506] overflow-hidden animate-in fade-in duration-500 p-10">
+      <div className="flex items-center justify-between mb-10 shrink-0">
+         <div>
+            <h2 className="text-xl font-black uppercase tracking-tight">Data Logic Center</h2>
+            <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mt-1">Heartbeat Stage for engine diagnostics</p>
+         </div>
+         <button 
+           onClick={runTestGraph}
+           disabled={isRunning}
+           className="px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white text-[12px] font-black uppercase rounded-2xl transition-all shadow-xl shadow-blue-600/20 flex items-center gap-3 disabled:opacity-50"
+         >
+           {isRunning ? <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" /> : <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>}
+           Run Test Graph
+         </button>
       </div>
 
-      <div className="flex-1 flex overflow-hidden">
-        {/* PANEL 1: NODE GRAPH */}
-        <div className="flex-1 border-r border-zinc-800 p-10 bg-[#070709] relative overflow-hidden">
-           <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
-           
-           <div className="flex flex-col h-full items-center justify-center gap-24 relative z-10">
-              <div className="flex items-center gap-12">
-                 {/* Input Node */}
-                 <div className={`w-40 p-5 rounded-2xl border transition-all duration-300 ${activeStep === 'input' ? 'bg-blue-600/20 border-blue-500 shadow-[0_0_40px_rgba(59,130,246,0.2)] scale-110' : 'bg-zinc-900/50 border-zinc-800'}`}>
-                    <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest mb-2 block">Source</span>
-                    <p className="text-[11px] font-bold text-zinc-300">Input Node</p>
-                    <div className={`mt-3 w-2 h-2 rounded-full ${payloads.input ? 'bg-green-500' : 'bg-zinc-800'}`} />
-                 </div>
+      <div className="flex-1 grid grid-cols-3 gap-8 overflow-hidden">
+         {/* INPUT BLOCK */}
+         <div className="flex flex-col bg-zinc-900/50 border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl">
+            <div className="p-5 border-b border-zinc-800 bg-zinc-800/20 flex items-center justify-between">
+               <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">1. Initial Input</span>
+               <div className="w-2 h-2 rounded-full bg-zinc-700" />
+            </div>
+            <div className="flex-1 p-6 font-mono text-[11px] text-blue-400 overflow-auto custom-scrollbar">
+               {testResult ? <pre>{JSON.stringify(testResult.input, null, 2)}</pre> : <span className="opacity-20">Waiting for trigger...</span>}
+            </div>
+         </div>
 
-                 {/* Arrow 1 */}
-                 <div className="w-20 h-px bg-zinc-800 relative">
-                    <div className={`absolute top-1/2 left-0 h-1 bg-blue-500 -translate-y-1/2 transition-all duration-1000 ${isExecuting && activeStep === 'transform' ? 'w-full opacity-100' : 'w-0 opacity-0'}`} />
-                 </div>
+         {/* TRANSFORM BLOCK */}
+         <div className="flex flex-col bg-zinc-900/50 border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl">
+            <div className="p-5 border-b border-zinc-800 bg-zinc-800/20 flex items-center justify-between">
+               <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">2. Node Processing</span>
+               <div className="w-2 h-2 rounded-full bg-blue-500" />
+            </div>
+            <div className="flex-1 p-6 font-mono text-[11px] text-zinc-500 overflow-auto custom-scrollbar">
+               {testResult && testResult.trace ? <pre>{JSON.stringify(testResult.trace[1].outputs, null, 2)}</pre> : <span className="opacity-20 italic">Awaiting trace data...</span>}
+            </div>
+         </div>
 
-                 {/* Transform Node */}
-                 <div className={`w-40 p-5 rounded-2xl border transition-all duration-300 ${activeStep === 'transform' ? 'bg-purple-600/20 border-purple-500 shadow-[0_0_40px_rgba(168,85,247,0.2)] scale-110' : 'bg-zinc-900/50 border-zinc-800'}`}>
-                    <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest mb-2 block">Logic</span>
-                    <p className="text-[11px] font-bold text-zinc-300">Transform</p>
-                    <div className={`mt-3 w-2 h-2 rounded-full ${payloads.transform ? 'bg-purple-500' : 'bg-zinc-800'}`} />
-                 </div>
-
-                 {/* Arrow 2 */}
-                 <div className="w-20 h-px bg-zinc-800 relative">
-                    <div className={`absolute top-1/2 left-0 h-1 bg-purple-500 -translate-y-1/2 transition-all duration-1000 ${isExecuting && activeStep === 'validate' ? 'w-full opacity-100' : 'w-0 opacity-0'}`} />
-                 </div>
-
-                 {/* Validate Node */}
-                 <div className={`w-40 p-5 rounded-2xl border transition-all duration-300 ${activeStep === 'validate' ? 'bg-yellow-600/20 border-yellow-500 shadow-[0_0_40px_rgba(234,179,8,0.2)] scale-110' : 'bg-zinc-900/50 border-zinc-800'}`}>
-                    <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest mb-2 block">Filter</span>
-                    <p className="text-[11px] font-bold text-zinc-300">Validate</p>
-                    <div className={`mt-3 w-2 h-2 rounded-full ${payloads.validate ? 'bg-yellow-500' : 'bg-zinc-800'}`} />
-                 </div>
-
-                 {/* Arrow 3 */}
-                 <div className="w-20 h-px bg-zinc-800 relative">
-                    <div className={`absolute top-1/2 left-0 h-1 bg-green-500 -translate-y-1/2 transition-all duration-1000 ${isExecuting && activeStep === 'output' ? 'w-full opacity-100' : 'w-0 opacity-0'}`} />
-                 </div>
-
-                 {/* Output Node */}
-                 <div className={`w-40 p-5 rounded-2xl border transition-all duration-300 ${activeStep === 'output' ? 'bg-green-600/20 border-green-500 shadow-[0_0_40px_rgba(34,197,94,0.2)] scale-110' : 'bg-zinc-900/50 border-zinc-800'}`}>
-                    <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest mb-2 block">Sink</span>
-                    <p className="text-[11px] font-bold text-zinc-300">Output Node</p>
-                    <div className={`mt-3 w-2 h-2 rounded-full ${payloads.output ? 'bg-green-500 animate-pulse' : 'bg-zinc-800'}`} />
-                 </div>
-              </div>
-           </div>
-        </div>
-
-        {/* PANEL 2: EXECUTION TRACE */}
-        <div className="w-96 border-r border-zinc-800 flex flex-col bg-zinc-900/20">
-          <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
-            <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Execution Trace</h4>
-            <span className="text-[9px] font-mono text-zinc-600 uppercase">{trace.length} Steps</span>
-          </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
-            {trace.length === 0 && (
-              <div className="h-full flex flex-col items-center justify-center opacity-10 space-y-4">
-                 <div className="w-12 h-12 border-2 border-dashed border-zinc-400 rounded-full" />
-                 <p className="text-[10px] font-mono uppercase tracking-[0.2em]">Trace Engine Idle</p>
-              </div>
-            )}
-            {trace.map((entry, i) => (
-              <div 
-                key={i} 
-                onClick={() => setInspectorTab(entry.id)}
-                className={`p-3 rounded-xl border transition-all cursor-pointer ${inspectorTab === entry.id ? 'bg-blue-600/10 border-blue-500/40 shadow-inner' : 'bg-black/20 border-zinc-800/50 hover:border-zinc-700'}`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[9px] font-black text-blue-400 uppercase">[{entry.label}]</span>
-                  <span className="text-[8px] font-mono text-zinc-600">{entry.time}ms</span>
-                </div>
-                <p className="text-[11px] text-zinc-400 font-medium italic">{entry.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* PANEL 3: LIVE PAYLOAD INSPECTOR */}
-        <div 
-          style={{ width: inspectorWidth }}
-          className="flex flex-col bg-[#050506] relative"
-        >
-          {/* RESIZE HANDLE */}
-          <div 
-            onMouseDown={startResize}
-            className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-600/50 transition-colors z-50"
-          />
-
-          <div className="h-14 border-b border-zinc-800 flex items-center px-6 gap-6 shrink-0 bg-zinc-900/20">
-             {['input', 'transform', 'validate', 'output'].map(id => (
-               <button 
-                 key={id}
-                 onClick={() => setInspectorTab(id)}
-                 disabled={!payloads[id]}
-                 className={`text-[9px] font-black uppercase tracking-widest transition-all border-b-2 h-full px-1 ${inspectorTab === id ? 'text-blue-500 border-blue-500' : 'text-zinc-600 border-transparent hover:text-zinc-400'} disabled:opacity-20`}
-               >
-                 {id}
-               </button>
-             ))}
-          </div>
-
-          <div className="flex-1 overflow-auto p-8 font-mono text-[11px] text-blue-300 leading-relaxed custom-scrollbar">
-            {payloads[inspectorTab] ? (
-              <pre className="animate-in fade-in slide-in-from-top-1 duration-300">
-                {JSON.stringify(payloads[inspectorTab], null, 2)}
-              </pre>
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center opacity-10">
-                 <svg className="w-10 h-10 mb-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg>
-                 <p className="text-[10px] uppercase tracking-widest">No Node Data Selected</p>
-              </div>
-            )}
-          </div>
-          
-          <div className="p-4 border-t border-zinc-800 bg-zinc-900/40 text-[8px] font-mono text-zinc-600 uppercase text-center tracking-[0.2em]">
-             Local Context Inspector v1.0
-          </div>
-        </div>
+         {/* OUTPUT BLOCK */}
+         <div className="flex flex-col bg-zinc-900/50 border border-blue-500/20 rounded-3xl overflow-hidden shadow-2xl">
+            <div className="p-5 border-b border-zinc-800 bg-blue-600/10 flex items-center justify-between">
+               <span className="text-[10px] font-black uppercase tracking-widest text-blue-400">3. Final Result</span>
+               <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]" />
+            </div>
+            <div className="flex-1 p-6 font-mono text-[11px] text-green-400 overflow-auto custom-scrollbar bg-green-500/[0.02]">
+               {testResult ? <pre>{JSON.stringify(testResult.finalOutput, null, 2)}</pre> : <span className="opacity-20 italic">Awaiting completion...</span>}
+            </div>
+         </div>
       </div>
     </div>
   );

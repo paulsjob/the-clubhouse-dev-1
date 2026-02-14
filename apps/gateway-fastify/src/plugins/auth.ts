@@ -1,11 +1,12 @@
 
-import { FastifyPluginAsync, FastifyRequest } from 'fastify';
+import 'fastify';
+import { FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
 import { config } from '../config';
 import { wrapError } from '../utils/responses';
 import { orgStore } from '../services/storage';
 
-// --- Fix: Augmented FastifyRequest to include RL-specific context via standard module augmentation ---
+// --- Fix: Ensure module augmentation works by having an import 'fastify' statement ---
 declare module 'fastify' {
   interface FastifyRequest {
     rl: {
