@@ -1,11 +1,24 @@
 
-import { liveSessionStore, ephemeralStateStore } from '../storage';
+import { liveSessionStore, ephemeralStateStore, resourceStore } from '../storage';
 import { internalFetch } from '../fetcher';
 import { transformRegistry } from '../transforms/registry';
 import { pubSubService } from './pubsub';
 
+interface MockGameState {
+  ticks: number;
+  homeScore: number;
+  awayScore: number;
+  inning: number;
+  half: 'top' | 'bottom';
+  outs: number;
+  balls: number;
+  strikes: number;
+}
+
 class PollingService {
   private timers: Map<string, NodeJS.Timeout> = new Map();
+  // ITEM 18: Transient state for mock games
+  private mockStates: Map<string, MockGameState> = new Map();
 
   async startSession(orgId: string, sessionId: string) {
     const session = await liveSessionStore.get(orgId, sessionId);
@@ -36,6 +49,7 @@ class PollingService {
       clearInterval(timer);
       this.timers.delete(sessionId);
     }
+    this.mockStates.delete(sessionId);
     await liveSessionStore.update(orgId, sessionId, { status: 'terminated' });
   }
 
@@ -48,21 +62,33 @@ class PollingService {
     }
 
     try {
-      const result = await internalFetch({
-        orgId,
-        resourceId: session.resourceId,
-        credentialId: session.credentialId,
-        path: session.path,
-        query: session.query
-      });
+      const resource = await resourceStore.get(orgId, session.resourceId);
+      if (!resource) throw new Error('Resource not found');
+
+      let rawPayload: any;
+
+      // ITEM 18: Mock Live Logic
+      if (resource.baseUrl === 'mock://mlb-live') {
+        rawPayload = this.generateMockMlbData(sessionId);
+      } else {
+        const result = await internalFetch({
+          orgId,
+          resourceId: session.resourceId,
+          credentialId: session.credentialId,
+          path: session.path,
+          query: session.query
+        });
+        rawPayload = result.body;
+      }
 
       const transform = transformRegistry[session.transform] || transformRegistry.passthrough;
-      const normalized = transform(result.body);
+      const normalized = transform(rawPayload);
 
       // Publish to all topics
       for (const topic of session.topics) {
-        pubSubService.publish(orgId, topic, normalized);
+        // ITEM 18: Ensure ephemeral store is updated BEFORE publish for schema discovery stability
         ephemeralStateStore.set(`${orgId}:${topic}`, normalized);
+        pubSubService.publish(orgId, topic, normalized);
       }
 
       await liveSessionStore.update(orgId, sessionId, {
@@ -76,8 +102,67 @@ class PollingService {
         consecutiveFailures: failures,
         lastError: e.message
       });
-      // In a real system, we'd handle exponential backoff by adjusting the interval
     }
+  }
+
+  /**
+   * ITEM 18: Generates evolving MLB data
+   */
+  private generateMockMlbData(sessionId: string): any {
+    let state = this.mockStates.get(sessionId);
+    if (!state) {
+      state = { 
+        ticks: 0, 
+        homeScore: 0, 
+        awayScore: 0, 
+        inning: 1, 
+        half: 'top',
+        outs: 0,
+        balls: 0,
+        strikes: 0
+      };
+    }
+
+    state.ticks++;
+    
+    // Game Logic
+    if (state.ticks % 3 === 0) state.homeScore++;
+    if (state.ticks % 5 === 0) state.awayScore++;
+    
+    state.strikes++;
+    if (state.strikes >= 3) {
+      state.strikes = 0;
+      state.balls = 0;
+      state.outs++;
+    }
+    
+    if (state.outs >= 3) {
+      state.outs = 0;
+      if (state.half === 'top') {
+        state.half = 'bottom';
+      } else {
+        state.half = 'top';
+        state.inning++;
+      }
+    }
+
+    this.mockStates.set(sessionId, state);
+
+    // Return in "raw-ish" format expected by mlb_scorebug_v1 transform
+    return {
+      gameId: `mock_${sessionId.split('_').pop()}`,
+      status: "live",
+      home: { id: "SEA", abbr: "SEA", name: "Seattle Seahawks", runs: state.homeScore },
+      away: { id: "NYY", abbr: "NYY", name: "New York Yankees", runs: state.awayScore },
+      inning: { number: state.inning, half: state.half },
+      count: { balls: state.balls, strikes: state.strikes, outs: state.outs },
+      bases: { first: state.ticks % 2 === 0, second: state.ticks % 4 === 0, third: false },
+      lastEvent: { 
+        type: state.strikes === 0 ? "strikeout" : "pitch", 
+        summary: `Pitch ${state.ticks} delivered.`, 
+        ts: Date.now() 
+      }
+    };
   }
 }
 

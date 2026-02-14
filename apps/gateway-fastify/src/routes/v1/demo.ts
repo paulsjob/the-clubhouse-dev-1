@@ -6,17 +6,20 @@ import {
   graphStore, 
   outputStore, 
   schemaStore,
-  latestOutputSchemaMap 
+  latestOutputSchemaMap,
+  liveSessionStore
 } from '../../services/storage';
 import { GraphExecutor } from '../../services/graphs/executor';
 import { SchemaDeriver } from '../../services/schema/derivation';
+import { pollingService } from '../../services/live/polling';
 import { wrapSuccess, wrapError } from '../../utils/responses';
 import { config } from '../../config';
 import { 
   Resource, 
   Graph, 
   Output, 
-  SchemaSnapshotV1 
+  SchemaSnapshotV1,
+  LiveSession
 } from '@renderless/contracts';
 
 /**
@@ -153,6 +156,84 @@ export const demoRoutes: FastifyPluginAsync = async (fastify) => {
       graphId: graph.id,
       outputId: output.id,
       schemaId
+    }, request.id);
+  });
+
+  /**
+   * ITEM 18: POST /v1/demo/mlb-live
+   * Bootstraps a real-time mock session.
+   */
+  fastify.post('/v1/demo/mlb-live', {
+    schema: {
+      tags: ['Demo'],
+      summary: 'Bootstrap MLB Live Session Demo',
+      description: 'Generates a live session that emits updates via SSE.',
+      body: {
+        type: 'object',
+        required: ['orgId'],
+        properties: {
+          orgId: { type: 'string' },
+          topic: { type: 'string', default: 'mlb.game.demo' },
+          pollIntervalMs: { type: 'number', default: 1000 }
+        }
+      },
+      security: [{ adminKeyHeader: [] }]
+    } as any
+  }, async (request) => {
+    const { orgId, topic, pollIntervalMs } = request.body as any;
+
+    // 1. Ensure Org
+    let org = await orgStore.getById(orgId);
+    if (!org) {
+      org = await orgStore.create(orgId, {
+        id: orgId,
+        orgId: orgId,
+        name: `Live Demo Org: ${orgId}`,
+        apiKey: `devkey_${orgId}`,
+        createdAt: Date.now(),
+        isActive: true
+      });
+    }
+
+    const suffix = Math.random().toString(36).substr(2, 4);
+
+    // 2. Resource with mock-live protocol
+    const resource: Resource = {
+      id: `res_live_${suffix}`,
+      orgId,
+      name: "MLB Live Mock Provider",
+      baseUrl: "mock://mlb-live",
+      mode: "http", // Logic handles protocol within http mode
+      requestTemplate: {},
+      paramsSchema: {},
+      credentialType: "none",
+      isActive: true
+    };
+    await resourceStore.create(orgId, resource);
+
+    // 3. Live Session
+    const session: LiveSession = {
+      id: `sess_live_${suffix}`,
+      orgId,
+      name: "MLB Real-time Session",
+      resourceId: resource.id,
+      pollIntervalMs: pollIntervalMs || 1000,
+      topics: [topic || 'mlb.game.demo'],
+      path: "/",
+      transform: "mlb_scorebug_v1",
+      status: "initializing",
+      consecutiveFailures: 0
+    };
+    await liveSessionStore.create(orgId, session);
+
+    // 4. Start immediately
+    await pollingService.startSession(orgId, session.id);
+
+    return wrapSuccess({
+      orgId,
+      apiKey: org.apiKey,
+      topic: session.topics[0],
+      liveSessionId: session.id
     }, request.id);
   });
 };
