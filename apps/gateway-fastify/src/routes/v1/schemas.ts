@@ -2,7 +2,7 @@
 import { FastifyPluginAsync } from 'fastify';
 import { schemaStore } from '../../services/storage';
 import { wrapSuccess, wrapError } from '../../utils/responses';
-import { SchemaBindingCandidateV1, SchemaSourceV1, SchemaIndexEntryV1 } from '@renderless/contracts';
+import { SchemaBindingCandidateV1, SchemaSourceV1, SchemaIndexEntryV1, SchemaFieldRefV1 } from '@renderless/contracts';
 
 export const schemaRoutes: FastifyPluginAsync = async (fastify) => {
   /**
@@ -88,17 +88,21 @@ export const schemaRoutes: FastifyPluginAsync = async (fastify) => {
 
   /**
    * GET /v1/schemas
+   * Returns list of schema snapshots for the org (most recent first)
    */
   fastify.get('/v1/schemas', {
     schema: {
       tags: ['Schemas'],
-      summary: 'List available schemas (Old)',
+      summary: 'List available schemas',
       description: 'Returns all schema snapshots discovered for this organization.',
     } as any
   }, async (request) => {
     const snapshots = await schemaStore.list(request.rl.orgId);
     
-    const candidates = snapshots.map(s => ({
+    // Sort most recent first for Item 14
+    const sortedSnapshots = [...snapshots].sort((a, b) => b.createdAt - a.createdAt);
+
+    const candidates = sortedSnapshots.map(s => ({
       schemaId: s.id,
       sourceType: s.sourceType,
       sourceId: s.sourceId,
@@ -132,6 +136,7 @@ export const schemaRoutes: FastifyPluginAsync = async (fastify) => {
 
   /**
    * GET /v1/schemas/:id/fields
+   * Returns a flattened list of fields for Studio dropdowns.
    */
   fastify.get('/v1/schemas/:id/fields', {
     schema: {
@@ -148,11 +153,13 @@ export const schemaRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.code(404).send(wrapError('NOT_FOUND', 'Schema snapshot not found', request.id));
     }
 
-    const bindableFields = snapshot.fields.map(f => ({
+    // Map internal fields to Studio bindable fields (Item 14)
+    const bindableFields: SchemaFieldRefV1[] = snapshot.fields.map(f => ({
       path: f.path,
       valueType: f.valueType,
-      example: f.example
-    }));
+      example: f.example,
+      isArray: f.path.includes('[]') || f.valueType === 'array'
+    })).sort((a, b) => a.path.localeCompare(b.path));
 
     const candidate: SchemaBindingCandidateV1 = {
       schemaId: snapshot.id,

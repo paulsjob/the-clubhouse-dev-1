@@ -29,6 +29,7 @@ export const SchemaFieldRefV1Schema = z.object({
   path: z.string(),
   valueType: z.enum(["null", "boolean", "number", "string", "object", "array"]),
   example: z.any(),
+  isArray: z.boolean().optional(),
 });
 
 export const SchemaBindingCandidateV1Schema = z.object({

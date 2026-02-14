@@ -34,6 +34,7 @@ export interface SchemaFieldRefV1 {
   path: string;
   valueType: SchemaFieldValueType;
   example: any;
+  isArray?: boolean; // Added in Item 14
 }
 
 /**
