@@ -1,18 +1,24 @@
 
 import { FastifyPluginAsync } from 'fastify';
-import { schemaStore } from '../../services/storage';
+import { 
+  outputStore, 
+  liveSessionStore, 
+  schemaStore, 
+  latestOutputSchemaMap, 
+  latestTopicSchemaMap 
+} from '../../services/storage';
 import { wrapSuccess, wrapError } from '../../utils/responses';
 import { 
   BindingManifestV1, 
   BindingFieldsResponseV1, 
-  SchemaSourceV1,
-  BindableFieldV1
+  BindableFieldV1,
+  SchemaSourceV1
 } from '@renderless/contracts';
 
 export const bindingRoutes: FastifyPluginAsync = async (fastify) => {
   /**
-   * GET /v1/bindings/manifest
-   * Returns all available sources and their latest schema IDs.
+   * ITEM 19: GET /v1/bindings/manifest
+   * Returns all available sources and their latest schema IDs for Studio binding.
    */
   fastify.get('/v1/bindings/manifest', {
     schema: {
@@ -21,39 +27,36 @@ export const bindingRoutes: FastifyPluginAsync = async (fastify) => {
       description: 'Lists all Outputs and Topics available for Studio data binding.',
     } as any
   }, async (request) => {
-    const snapshots = await schemaStore.list(request.rl.orgId);
-    
-    // Group by source handle to find unique sources
-    const sourceMap = new Map<string, { source: SchemaSourceV1, latestId: string, latestTs: number }>();
+    const orgId = request.rl.orgId;
 
-    for (const s of snapshots) {
-      const source: SchemaSourceV1 = s.source || { 
-        kind: s.sourceType === 'output_run' ? 'output' : 'topic' as any, 
-        [s.sourceType === 'output_run' ? 'outputId' : 'topic']: s.sourceId 
-      } as any;
-      
-      const handle = `${source.kind}:${(source as any).outputId || (source as any).topic || (source as any).graphId}`;
-      const existing = sourceMap.get(handle);
+    // 1. Fetch Outputs from outputStore
+    const outputs = await outputStore.list(orgId);
+    const outputManifest = outputs.map(o => ({
+      outputId: o.id,
+      name: o.name,
+      latestSchemaId: latestOutputSchemaMap.get(o.id) || null
+    }));
 
-      if (!existing || s.createdAt > existing.latestTs) {
-        sourceMap.set(handle, { source, latestId: s.id, latestTs: s.createdAt });
-      }
-    }
+    // 2. Fetch unique Topics from liveSessionStore
+    const sessions = await liveSessionStore.list(orgId);
+    const uniqueTopics = Array.from(new Set(sessions.flatMap(s => s.topics)));
+    const topicManifest = uniqueTopics.map(t => ({
+      topic: t,
+      latestSchemaId: latestTopicSchemaMap.get(t) || null
+    }));
 
     const manifest: BindingManifestV1 = {
       generatedAt: Date.now(),
-      sources: Array.from(sourceMap.values()).map(v => ({
-        source: v.source,
-        latestSchemaId: v.latestId
-      }))
+      outputs: outputManifest,
+      topics: topicManifest
     };
 
     return wrapSuccess(manifest, request.id);
   });
 
   /**
-   * GET /v1/bindings/fields
-   * Returns flattened fields for a specific source and optional schema ID.
+   * ITEM 19: GET /v1/bindings/fields
+   * Returns flattened, sanitized fields for a specific source for Studio dropdowns.
    */
   fastify.get('/v1/bindings/fields', {
     schema: {
@@ -72,34 +75,55 @@ export const bindingRoutes: FastifyPluginAsync = async (fastify) => {
       }
     } as any
   }, async (request, reply) => {
+    const orgId = request.rl.orgId;
     const q = request.query as any;
-    const source: SchemaSourceV1 = { 
-      kind: q.kind, 
-      [q.kind === 'output' ? 'outputId' : q.kind === 'topic' ? 'topic' : 'graphId']: q.outputId || q.topic || q.graphId 
-    } as any;
 
     let snapshot;
     if (q.schemaId) {
-      snapshot = await schemaStore.get(request.rl.orgId, q.schemaId);
+      snapshot = await schemaStore.get(orgId, q.schemaId);
     } else {
-      snapshot = schemaStore.getLatestBySource(request.rl.orgId, source);
+      const source: SchemaSourceV1 = { 
+        kind: q.kind, 
+        [q.kind === 'output' ? 'outputId' : q.kind === 'topic' ? 'topic' : 'graphId']: q.outputId || q.topic || q.graphId 
+      } as any;
+      snapshot = schemaStore.getLatestBySource(orgId, source);
     }
 
     if (!snapshot) {
-      return reply.code(404).send(wrapError('NOT_FOUND', 'Schema not found for this source', request.id));
+      return reply.code(404).send(wrapError('NOT_FOUND', 'Schema snapshot not found for this source.', request.id));
     }
 
-    // Map internal fields to Studio bindable fields
-    const fields: BindableFieldV1[] = snapshot.fields.map(f => ({
-      path: f.path,
-      valueType: f.valueType,
-      example: f.example ? (typeof f.example === 'string' && f.example.length > 80 ? f.example.slice(0, 77) + '...' : f.example) : undefined,
-      isArray: f.path.includes('[]') || f.valueType === 'array'
-    })).sort((a, b) => a.path.localeCompare(b.path));
+    // Map internal fields to Studio bindable fields (Prompt 19 requirements)
+    const fields: BindableFieldV1[] = snapshot.fields.map(f => {
+      // Example Sanitization: primitives only, max 80 chars
+      let example = f.example;
+      if (typeof example === 'string') {
+        if (example.length > 80) {
+          example = example.slice(0, 77) + '...';
+        }
+      } else if (typeof example === 'object' && example !== null) {
+        example = undefined; // Strip objects/arrays from Studio examples
+      }
+
+      return {
+        path: f.path,
+        valueType: f.valueType,
+        example,
+        // isArray should be true if path contains [] OR valueType is array
+        isArray: f.path.includes('[]') || f.valueType === 'array'
+      };
+    })
+    // Sorted ascending by path (stable UI)
+    .sort((a, b) => a.path.localeCompare(b.path));
 
     const response: BindingFieldsResponseV1 = {
-      source: snapshot.source || source,
-      schemaId: snapshot.id,
+      source: {
+        kind: q.kind,
+        outputId: q.outputId,
+        topic: q.topic,
+        graphId: q.graphId,
+        schemaId: snapshot.id
+      },
       fields
     };
 

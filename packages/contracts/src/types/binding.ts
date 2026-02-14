@@ -12,21 +12,31 @@ export interface BindableFieldV1 {
 }
 
 /**
- * ITEM 16: High-level manifest of all bindable sources in the org
+ * ITEM 19: High-level manifest of all bindable sources in the org
  */
 export interface BindingManifestV1 {
   generatedAt: number;
-  sources: Array<{
-    source: SchemaSourceV1;
-    latestSchemaId?: string;
+  outputs: Array<{
+    outputId: string;
+    name: string;
+    latestSchemaId: string | null;
+  }>;
+  topics: Array<{
+    topic: string;
+    latestSchemaId: string | null;
   }>;
 }
 
 /**
- * ITEM 16: Detailed field response for a specific source
+ * ITEM 19: Detailed field response for a specific source
  */
 export interface BindingFieldsResponseV1 {
-  source: SchemaSourceV1;
-  schemaId: string;
+  source: {
+    kind: "output" | "topic" | "graph";
+    outputId?: string;
+    topic?: string;
+    graphId?: string;
+    schemaId: string;
+  };
   fields: BindableFieldV1[];
 }
