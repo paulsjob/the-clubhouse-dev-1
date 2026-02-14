@@ -29,6 +29,20 @@ export const deployRoutes: FastifyPluginAsync = async (fastify) => {
       orgId
     };
 
+    const deploymentId = `dep_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+    const record = {
+      deploymentId,
+      id: deploymentId,
+      orgId: request.rl.orgId,
+      outputId,
+      route,
+      status: 'registered',
+      createdAt: Date.now(),
+    };
+
+deployStore.put(record);
+
     await deployStore.create(orgId, record);
 
     return wrapSuccess(record, request.id);

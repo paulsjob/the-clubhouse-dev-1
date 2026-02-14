@@ -153,7 +153,8 @@ export const orgStore = new InMemoryStore<Organization & { orgId: string }>();
 
 // ITEM 21
 export const busStore = new BusStore();
-export const deployStore = new InMemoryStore<DeployResponseV1 & { orgId: string }>();
+export type DeployRecord = (DeployResponseV1 & { orgId: string }) & { id: string };
+export const deployStore = new InMemoryStore<DeployRecord>();
 export const traceStore = new Map<string, EngineTraceEventV1[]>();
 
 export const ephemeralStateStore = new Map<string, any>();

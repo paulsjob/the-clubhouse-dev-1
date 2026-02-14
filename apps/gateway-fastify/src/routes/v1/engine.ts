@@ -142,7 +142,9 @@ export const engineRoutes: FastifyPluginAsync = async (fastify) => {
 
     for (const node of sortedNodes) {
       const inputs: Record<string, any> = {};
-      graph!.edges.filter(e => e.toNodeId === node.id).forEach(edge => {
+      graph!.edges
+        .filter((e: { toNodeId: string }) => e.toNodeId === node.id)
+        .forEach((edge: any) => {
         const sourceOut = nodeOutputs[edge.fromNodeId] || {};
         inputs[edge.toPort] = sourceOut[edge.fromPort];
       });
