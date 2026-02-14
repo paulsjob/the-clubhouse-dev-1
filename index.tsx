@@ -87,6 +87,12 @@ const StudioApp = () => {
   const [showSafeZones, setShowSafeZones] = useState(true);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   
+  // ITEM 24: Resizable Inspector State
+  const [inspectorWidth, setInspectorWidth] = useState(() => {
+    const saved = localStorage.getItem('rl-inspector-width');
+    return saved ? parseInt(saved, 10) : 320;
+  });
+
   const { isPanelOpen, setPanelOpen } = useAssetsStore();
 
   const [layout, setLayout] = useState<Layout>({
@@ -191,6 +197,33 @@ const StudioApp = () => {
   };
 
   const effectiveTool = useMemo(() => isSpacePressed ? 'hand' : tool, [isSpacePressed, tool]);
+
+  // ITEM 24: Resizing Logic
+  const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = inspectorWidth;
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const delta = startX - moveEvent.clientX;
+      const newWidth = Math.min(Math.max(startWidth + delta, 280), 600);
+      setInspectorWidth(newWidth);
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = 'default';
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    document.body.style.cursor = 'col-resize';
+  }, [inspectorWidth]);
+
+  useEffect(() => {
+    localStorage.setItem('rl-inspector-width', inspectorWidth.toString());
+  }, [inspectorWidth]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -406,7 +439,17 @@ const StudioApp = () => {
         </div>
       </div>
 
-      <div className="w-80 border-l border-zinc-800 flex flex-col bg-zinc-900 shadow-[-20px_0_60px_rgba(0,0,0,0.8)] z-40">
+      {/* ITEM 24: Resizable Sidebar */}
+      <div 
+        style={{ width: inspectorWidth }}
+        className="border-l border-zinc-800 flex flex-col bg-zinc-900 shadow-[-20px_0_60px_rgba(0,0,0,0.8)] z-40 relative group/sidebar"
+      >
+        {/* RESIZER HANDLE */}
+        <div 
+          onMouseDown={handleResizeMouseDown}
+          className="absolute left-[-2px] top-0 bottom-0 w-1 cursor-col-resize z-50 hover:bg-blue-600/50 transition-colors bg-transparent"
+        />
+
         <div className="px-6 py-4 bg-black/10 border-b border-zinc-800"><h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Inspector</h3></div>
         <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8 pb-32">
           {selectedElements.length === 1 ? (
@@ -497,9 +540,55 @@ const StudioApp = () => {
                   })}
                 </div>
               </div>
+
+              {/* ITEM 24: Live Bus Monitor Display */}
+              <div className="space-y-3 pt-8 border-t border-zinc-800/50">
+                <div className="flex items-center justify-between px-1">
+                  <label className="text-[9px] font-black uppercase text-zinc-500 tracking-widest">Live Bus Monitor</label>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.4)]" />
+                    <span className="text-[8px] font-mono text-green-500 uppercase tracking-tighter">Connected</span>
+                  </div>
+                </div>
+                <div className="bg-black/60 rounded-2xl border border-zinc-800/80 overflow-hidden shadow-xl">
+                  <div className="p-3 border-b border-zinc-800/50 flex items-center justify-between bg-zinc-900/40">
+                    <span className="text-[9px] font-mono text-blue-400">mlb.game.sim</span>
+                    <span className="text-[8px] font-mono text-zinc-600 uppercase">SEQ: 1.04k</span>
+                  </div>
+                  <div className="p-4 h-32 overflow-y-auto custom-scrollbar bg-black/30">
+                    <pre className="text-[9px] font-mono text-zinc-500 leading-relaxed">
+{`{
+  "home": { "runs": 5 },
+  "away": { "runs": 3 },
+  "inning": 8,
+  "half": "top",
+  "outs": 2,
+  "count": { "b": 2, "s": 1 }
+}`}
+                    </pre>
+                  </div>
+                  <div className="p-2.5 bg-zinc-900/60 flex items-center justify-between border-t border-zinc-800/50">
+                    <div className="flex gap-2">
+                       <div className="w-2 h-2 rounded-full bg-zinc-800" />
+                       <div className="w-2 h-2 rounded-full bg-zinc-800" />
+                    </div>
+                    <span className="text-[8px] font-mono text-zinc-600 uppercase">Auto Discovery ACTIVE</span>
+                  </div>
+                </div>
+              </div>
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center h-full gap-4 opacity-30 mt-32"><p className="text-[10px] font-black uppercase tracking-[0.2em] leading-loose text-center">Select a layer<br/>to begin editing</p></div>
+            <div className="flex flex-col items-center justify-center h-full gap-4 opacity-30 mt-32">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] leading-loose text-center">Select a layer<br/>to begin editing</p>
+              {/* Optional Empty State Bus Info */}
+              <div className="mt-8 p-4 border border-zinc-800/50 rounded-2xl bg-black/20 w-full">
+                <span className="text-[8px] font-mono text-zinc-700 uppercase block mb-2">Bus Listener State</span>
+                <div className="flex items-center gap-2">
+                  <div className="w-1 h-1 rounded-full bg-green-500" />
+                  <span className="text-[8px] font-mono text-zinc-600 uppercase">8 Active Topics</span>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>

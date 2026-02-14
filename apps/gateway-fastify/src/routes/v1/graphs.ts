@@ -2,6 +2,7 @@
 import { FastifyPluginAsync } from 'fastify';
 import { graphStore } from '../../services/storage';
 import { GraphExecutor } from '../../services/graphs/executor';
+import { GraphValidator } from '../../services/graphs/validator';
 import { wrapSuccess, wrapError } from '../../utils/responses';
 import { GraphSchema } from '@renderless/contracts';
 
@@ -49,6 +50,56 @@ export const graphRoutes: FastifyPluginAsync = async (fastify) => {
       return wrapSuccess(created, request.id);
     } catch (e: any) {
       return reply.code(400).send(wrapError('VALIDATION_ERROR', e.message, request.id));
+    }
+  });
+
+  /**
+   * ITEM 23: POST /v1/graphs/:id/validate
+   * Performs static structure analysis without execution.
+   */
+  fastify.post('/v1/graphs/:id/validate', {
+    schema: {
+      tags: ['Graphs'],
+      summary: 'Validate graph structure',
+      params: { type: 'object', properties: { id: { type: 'string' } } }
+    } as any
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const graph = await graphStore.get(request.rl.orgId, id);
+    if (!graph) return reply.code(404).send(wrapError('NOT_FOUND', 'Graph not found', request.id));
+
+    const result = GraphValidator.validate(graph);
+    return wrapSuccess(result, request.id);
+  });
+
+  /**
+   * ITEM 23: POST /v1/graphs/:id/preview
+   * Executes the graph and returns full intermediate data trace.
+   */
+  fastify.post('/v1/graphs/:id/preview', {
+    schema: {
+      tags: ['Graphs'],
+      summary: 'Preview graph execution',
+      description: 'Executes graph with __debug=true to capture intermediate data.',
+      params: { type: 'object', properties: { id: { type: 'string' } } },
+      body: { type: 'object', properties: { params: { type: 'object' } } }
+    } as any
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { params } = (request.body as any) || {};
+
+    const graph = await graphStore.get(request.rl.orgId, id);
+    if (!graph) return reply.code(404).send(wrapError('NOT_FOUND', 'Graph not found', request.id));
+
+    try {
+      // Force debug mode for previews
+      const execution = await GraphExecutor.run(graph, request.rl.orgId, { 
+        ...params, 
+        __debug: true 
+      });
+      return wrapSuccess(execution, request.id);
+    } catch (e: any) {
+      return reply.code(400).send(wrapError('PREVIEW_ERROR', e.message, request.id));
     }
   });
 
