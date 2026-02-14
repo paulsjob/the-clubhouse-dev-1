@@ -200,7 +200,7 @@ export async function importOrgSnapshot(orgId: string, snapshot: SnapshotV1, mod
   const tasks: Promise<any>[] = [
     ...snapshot.credentials.map(item => credentialStore.create(orgId, { ...item, orgId })),
     ...snapshot.resources.map(item => resourceStore.create(orgId, { ...item, orgId })),
-    ...snapshot.graphs.map(item => graphStore.create(orgId, { ...item, orgId })),
+    ...snapshot.graphs.map(item => graphStore.list(orgId).then(() => graphStore.create(orgId, { ...item, orgId }))),
     ...snapshot.outputs.map(item => outputStore.create(orgId, { ...item, orgId })),
     ...snapshot.liveSessions.map(item => liveSessionStore.create(orgId, { ...item, orgId })),
     ...snapshot.schemas.map(item => schemaStore.create(orgId, { ...item, orgId })),

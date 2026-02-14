@@ -1,33 +1,21 @@
-
 import { z } from 'zod';
 import { GraphSchema } from './graph';
-
-export const EngineValidateRequestV1Schema = z.object({
-  graphId: z.string().optional(),
-  graph: GraphSchema.optional(),
-}).refine(data => data.graphId || data.graph, {
-  message: "Either graphId or graph must be provided"
-});
-
-import { z } from 'zod';
-import { GraphSnapshotV1Schema } from './graph'; // or wherever GraphSnapshotV1Schema is imported from in this repo
-
-// If this file already imports GraphSnapshotV1Schema, do not duplicate, just keep one.
 
 export const EngineValidateRequestV1Schema = z
   .object({
     graphId: z.string().optional(),
-    graph: GraphSnapshotV1Schema.optional(),
+    graph: GraphSchema.optional(),
   })
-  .refine((v) => !!v.graphId || !!v.graph, {
-    message: 'Either graphId or graph is required',
+  .refine((data) => data.graphId || data.graph, {
+    message: 'Either graphId or graph must be provided',
   });
 
 export const EngineRunRequestV1Schema = z
   .object({
     graphId: z.string().optional(),
-    graph: GraphSnapshotV1Schema.optional(),
-    params: z.record(z.any()).optional(),
+    graph: GraphSchema.optional(),
+    // Fix: Zod record requires key and value schemas
+    params: z.record(z.string(), z.any()).optional(),
     trace: z.boolean().optional(),
   })
   .refine((v) => !!v.graphId || !!v.graph, {
