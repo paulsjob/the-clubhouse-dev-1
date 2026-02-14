@@ -103,6 +103,36 @@ export const outputRoutes: FastifyPluginAsync = async (fastify) => {
 
     try {
       const result = await GraphExecutor.run(graph, request.rl.orgId, params);
+
+      // ITEM 15: Automatic Schema Derivation Hook
+      // After a successful output execution, we derive the current data structure
+      // and store it as a discoverable schema snapshot for the organization.
+      try {
+        const fields = SchemaDeriver.derive(result.result);
+        const hash = SchemaDeriver.generateHash(fields);
+        
+        const snapshotId = `schema_auto_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+        const snapshot: SchemaSnapshotV1 = {
+          id: snapshotId,
+          orgId: request.rl.orgId,
+          createdAt: Date.now(),
+          sourceType: "output_run",
+          sourceId: id,
+          fields,
+          hash,
+          source: { kind: 'output', outputId: id }
+        };
+
+        await schemaStore.create(request.rl.orgId, snapshot);
+        latestOutputSchemaMap.set(id, snapshot.id);
+      } catch (schemaErr: any) {
+        // Log error but do not fail the output run
+        fastify.log.error(
+          { outputId: id, error: schemaErr.message }, 
+          'Automatic schema derivation failed for output run'
+        );
+      }
+
       return wrapSuccess(result, request.id);
     } catch (e: any) {
       return reply.code(400).send(wrapError('EXECUTION_ERROR', e.message, request.id));
