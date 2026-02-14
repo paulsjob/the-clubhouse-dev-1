@@ -36,8 +36,8 @@ export const demoRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', adminAuthPreHandler);
 
   /**
-   * POST /v1/demo/mlb-scorebug
-   * Bootstraps a complete MLB demo stack for an organization.
+   * ITEM 17: POST /v1/demo/mlb-scorebug
+   * Bootstraps a complete MLB demo pipeline for an organization.
    */
   fastify.post('/v1/demo/mlb-scorebug', {
     schema: {
@@ -49,6 +49,8 @@ export const demoRoutes: FastifyPluginAsync = async (fastify) => {
         required: ['orgId'],
         properties: {
           orgId: { type: 'string' },
+          orgName: { type: 'string' },
+          apiKey: { type: 'string' },
           mode: { type: 'string', enum: ['mock', 'http'], default: 'mock' },
           baseUrl: { type: 'string' }
         }
@@ -56,7 +58,7 @@ export const demoRoutes: FastifyPluginAsync = async (fastify) => {
       security: [{ adminKeyHeader: [] }]
     } as any
   }, async (request, reply) => {
-    const { orgId, mode, baseUrl } = request.body as any;
+    const { orgId, orgName, apiKey, mode, baseUrl } = request.body as any;
 
     // 1. Ensure Org Exists
     let org = await orgStore.getById(orgId);
@@ -64,8 +66,8 @@ export const demoRoutes: FastifyPluginAsync = async (fastify) => {
       org = await orgStore.create(orgId, {
         id: orgId,
         orgId: orgId,
-        name: `Demo Org: ${orgId}`,
-        apiKey: `devkey_${orgId}`,
+        name: orgName || `Demo Org: ${orgId}`,
+        apiKey: apiKey || `devkey_${orgId}`,
         createdAt: Date.now(),
         isActive: true
       });
@@ -77,9 +79,10 @@ export const demoRoutes: FastifyPluginAsync = async (fastify) => {
     const resource: Resource = {
       id: `res_mlb_${suffix}`,
       orgId,
-      name: "MLB Demo Feed",
+      name: "Demo MLB (mock)",
       baseUrl: mode === 'mock' ? 'mock://mlb' : (baseUrl || 'https://api.example.com/mlb'),
       mode: 'http',
+      providerHint: 'mock',
       requestTemplate: {},
       paramsSchema: {},
       credentialType: 'none',
@@ -91,7 +94,7 @@ export const demoRoutes: FastifyPluginAsync = async (fastify) => {
     const graph: Graph = {
       id: `graph_mlb_${suffix}`,
       orgId,
-      name: "MLB Transform Logic",
+      name: "Demo MLB Scorebug",
       version: "1.0.0",
       paramsSchema: {},
       nodes: [
@@ -116,7 +119,7 @@ export const demoRoutes: FastifyPluginAsync = async (fastify) => {
     const output: Output = {
       id: `out_mlb_${suffix}`,
       orgId,
-      name: "MLB Scorebug Endpoint",
+      name: "Demo MLB Scorebug Output",
       graphId: graph.id,
       type: "endpoint",
       config: {},
@@ -124,7 +127,7 @@ export const demoRoutes: FastifyPluginAsync = async (fastify) => {
     };
     await outputStore.create(orgId, output);
 
-    // 5. Generate Initial Schema
+    // 5. Generate Initial Schema (Execute once internally)
     let schemaId: string | undefined;
     try {
       const execution = await GraphExecutor.run(graph, orgId, {});
@@ -150,7 +153,7 @@ export const demoRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     return wrapSuccess({
-      orgId,
+      orgId: org.id,
       apiKey: org.apiKey,
       resourceId: resource.id,
       graphId: graph.id,
@@ -203,7 +206,7 @@ export const demoRoutes: FastifyPluginAsync = async (fastify) => {
       orgId,
       name: "MLB Live Mock Provider",
       baseUrl: "mock://mlb-live",
-      mode: "http", // Logic handles protocol within http mode
+      mode: "http",
       requestTemplate: {},
       paramsSchema: {},
       credentialType: "none",
@@ -230,7 +233,7 @@ export const demoRoutes: FastifyPluginAsync = async (fastify) => {
     await pollingService.startSession(orgId, session.id);
 
     return wrapSuccess({
-      orgId,
+      orgId: org.id,
       apiKey: org.apiKey,
       topic: session.topics[0],
       liveSessionId: session.id
