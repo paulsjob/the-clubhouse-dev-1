@@ -170,7 +170,7 @@ export const demoRoutes: FastifyPluginAsync = async (fastify) => {
     schema: {
       tags: ['Demo'],
       summary: 'Bootstrap MLB Live Session Demo',
-      description: 'Generates a live session that emits updates via SSE.',
+      description: 'Generates a live session that emits updates via SSE. Consume the stream at GET /v1/live/stream/:topic',
       body: {
         type: 'object',
         required: ['orgId'],
@@ -204,9 +204,10 @@ export const demoRoutes: FastifyPluginAsync = async (fastify) => {
     const resource: Resource = {
       id: `res_live_${suffix}`,
       orgId,
-      name: "MLB Live Mock Provider",
+      name: "Demo MLB Live (mock)",
       baseUrl: "mock://mlb-live",
       mode: "http",
+      providerHint: "mock",
       requestTemplate: {},
       paramsSchema: {},
       credentialType: "none",
@@ -218,7 +219,7 @@ export const demoRoutes: FastifyPluginAsync = async (fastify) => {
     const session: LiveSession = {
       id: `sess_live_${suffix}`,
       orgId,
-      name: "MLB Real-time Session",
+      name: "Demo MLB Live Session",
       resourceId: resource.id,
       pollIntervalMs: pollIntervalMs || 1000,
       topics: [topic || 'mlb.game.demo'],
@@ -236,7 +237,8 @@ export const demoRoutes: FastifyPluginAsync = async (fastify) => {
       orgId: org.id,
       apiKey: org.apiKey,
       topic: session.topics[0],
-      liveSessionId: session.id
+      liveSessionId: session.id,
+      resourceId: resource.id
     }, request.id);
   });
 };
