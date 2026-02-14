@@ -73,6 +73,65 @@ const PropertyInput = ({ label, value, onChange, onCommit, suffix = "" }: { labe
   </div>
 );
 
+// --- ITEM 26: FOLLOW MODE OVERLAY ---
+const FollowModeOverlay = ({ isActive, events, onClose }: { isActive: boolean, events: any[], onClose: () => void }) => {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [events]);
+
+  if (!isActive) return null;
+
+  return (
+    <div className="fixed bottom-24 right-10 w-96 max-h-[500px] bg-black/90 backdrop-blur-2xl border border-blue-500/30 rounded-3xl shadow-[0_0_80px_rgba(59,130,246,0.3)] z-[200] flex flex-col overflow-hidden animate-in slide-in-from-right duration-500">
+      <div className="p-5 border-b border-zinc-800 bg-blue-600/10 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-2 h-2 rounded-full bg-blue-500 animate-ping" />
+          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400">Follow-the-Data Mode</span>
+        </div>
+        <button onClick={onClose} className="p-1 text-zinc-500 hover:text-white transition-colors">
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar bg-black/20">
+        {events.length === 0 && (
+          <div className="py-12 flex flex-col items-center justify-center opacity-30 gap-4">
+             <div className="w-10 h-10 border-2 border-dashed border-zinc-600 rounded-full animate-spin" />
+             <span className="text-[10px] font-mono uppercase tracking-widest">Awaiting Bus Logic...</span>
+          </div>
+        )}
+        {events.map((ev, i) => (
+          <div key={i} className={`p-4 rounded-2xl border ${ev.type === 'FOLLOW_START' ? 'bg-zinc-800/40 border-zinc-700' : ev.type === 'FOLLOW_END' ? 'bg-green-600/10 border-green-500/40' : 'bg-black/40 border-zinc-800'} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[8px] font-mono text-zinc-500">{new Date(ev.ts).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+              {ev.stepIndex && <span className="text-[8px] font-black bg-blue-600 text-white px-1.5 py-0.5 rounded">STEP {ev.stepIndex}</span>}
+            </div>
+            <p className="text-[11px] font-bold text-zinc-300 uppercase tracking-tight">{ev.message || ev.nodeType || 'Event'}</p>
+            {ev.outputs && (
+              <pre className="mt-3 p-3 bg-black/60 rounded-xl text-[9px] font-mono text-blue-400 overflow-x-auto">
+                {JSON.stringify(ev.outputs, null, 2)}
+              </pre>
+            )}
+            {ev.finalResult && (
+              <div className="mt-3 p-3 bg-green-500/10 rounded-xl">
+                 <span className="text-[8px] font-black text-green-500 uppercase block mb-1">Final Bus Payload</span>
+                 <pre className="text-[9px] font-mono text-green-400 whitespace-pre-wrap">{JSON.stringify(ev.finalResult, null, 2)}</pre>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="p-4 bg-zinc-900/50 border-t border-zinc-800 text-[8px] font-mono text-zinc-600 uppercase text-center tracking-[0.3em]">
+        Observing special.debug.follow
+      </div>
+    </div>
+  );
+};
+
 // --- STUDIO APP FEATURE ---
 const StudioApp = () => {
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -87,6 +146,10 @@ const StudioApp = () => {
   const [showSafeZones, setShowSafeZones] = useState(true);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   
+  // ITEM 26: Follow Mode State
+  const [followActive, setFollowActive] = useState(false);
+  const [followEvents, setFollowEvents] = useState<any[]>([]);
+
   // ITEM 24: Resizable Inspector State
   const [inspectorWidth, setInspectorWidth] = useState(() => {
     const saved = localStorage.getItem('rl-inspector-width');
@@ -197,6 +260,39 @@ const StudioApp = () => {
   };
 
   const effectiveTool = useMemo(() => isSpacePressed ? 'hand' : tool, [isSpacePressed, tool]);
+
+  // ITEM 26: Follow Mode Activation
+  const handleFollowData = async () => {
+    setFollowActive(true);
+    setFollowEvents([]);
+    
+    // Wire SSE listener for the debug topic
+    const eventSource = new EventSource('/v1/live/stream/debug.follow.*');
+    eventSource.onmessage = (e) => {
+      const payload = JSON.parse(e.data);
+      if (payload.data) {
+        setFollowEvents(prev => [...prev, payload.data]);
+        
+        // Visual Feedback on Canvas
+        if (payload.data.nodeId) {
+          // Temporarily highlight nodes in layout? 
+          // Instead, we just show them in the overlay for stability
+        }
+      }
+    };
+
+    try {
+      await fetch('/v1/follow-the-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-rl-org-id': 'org_demo', 'x-rl-api-key': 'devkey_123' },
+        body: JSON.stringify({ graphId: 'mlb_demo_graph' }) 
+      });
+    } catch (err) {
+      console.error("Follow Mode Start Failed", err);
+    }
+
+    // Auto-close handler stored in ref or state if needed
+  };
 
   // ITEM 24: Resizing Logic
   const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
@@ -350,6 +446,16 @@ const StudioApp = () => {
               <button onClick={redo} disabled={redoStack.length === 0} className="p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 disabled:opacity-10"><svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="m15 14 5-5-5-5"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/></svg></button>
             </div>
           </div>
+          
+          {/* ITEM 26: FOLLOW THE DATA BUTTON */}
+          <button 
+            onClick={handleFollowData}
+            className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-black uppercase rounded-2xl transition-all shadow-xl shadow-blue-600/20 flex items-center justify-center gap-3 border border-blue-400/30"
+          >
+            <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            Follow the Data
+          </button>
+
           <div className="grid grid-cols-3 gap-2">
             <button onClick={() => addElement('text')} className="flex flex-col items-center justify-center gap-2 py-4 bg-zinc-800/40 border border-zinc-800 rounded-2xl transition-all group hover:bg-zinc-800 hover:border-zinc-500">
               <div className="text-zinc-500 group-hover:text-blue-400 transition-colors"><svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg></div>
@@ -592,6 +698,12 @@ const StudioApp = () => {
           )}
         </div>
       </div>
+
+      <FollowModeOverlay 
+        isActive={followActive} 
+        events={followEvents} 
+        onClose={() => setFollowActive(false)} 
+      />
 
       <AssetExplorer />
       <NewFolderDialog />

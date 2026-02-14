@@ -22,7 +22,8 @@ import { bindingRoutes } from './routes/v1/bindings';
 import { bindingSetRoutes } from './routes/v1/bindingSets';
 import { simulationRoutes } from './routes/v1/simulations';
 import { busRoutes } from './routes/v1/bus';
-import { deployRoutes } from './routes/v1/deploy'; // Added in Item 25
+import { deployRoutes } from './routes/v1/deploy';
+import { followRoutes } from './routes/v1/follow'; // ITEM 26
 import { demoRoutes } from './routes/v1/demo';
 import pkg from '../package.json';
 
@@ -113,7 +114,8 @@ export const buildServer = (): FastifyInstance => {
   server.register(bindingSetRoutes);
   server.register(simulationRoutes);
   server.register(busRoutes);
-  server.register(deployRoutes); // Added in Item 25
+  server.register(deployRoutes);
+  server.register(followRoutes); // ITEM 26
   server.register(demoRoutes);
 
   return server;
