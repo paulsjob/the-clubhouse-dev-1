@@ -17,7 +17,9 @@ import { graphRoutes } from './routes/v1/graphs';
 import { outputRoutes } from './routes/v1/outputs';
 import { snapshotRoutes } from './routes/v1/snapshot';
 import { orgRoutes } from './routes/v1/orgs';
-import { schemaRoutes } from './routes/v1/schemas'; // ITEM 14
+import { schemaRoutes } from './routes/v1/schemas';
+import { bindingRoutes } from './routes/v1/bindings';
+import { demoRoutes } from './routes/v1/demo'; // ITEM 17
 import pkg from '../package.json';
 
 export const buildServer = (): FastifyInstance => {
@@ -102,7 +104,9 @@ export const buildServer = (): FastifyInstance => {
   server.register(outputRoutes);
   server.register(snapshotRoutes);
   server.register(orgRoutes);
-  server.register(schemaRoutes); // ITEM 14
+  server.register(schemaRoutes);
+  server.register(bindingRoutes);
+  server.register(demoRoutes); // ITEM 17
 
   return server;
 };
