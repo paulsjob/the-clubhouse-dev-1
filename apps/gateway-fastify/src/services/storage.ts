@@ -1,7 +1,7 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { Credential, Resource, LiveSession, Graph, Output, SchemaSnapshotV1, SnapshotV1, Organization } from '@renderless/contracts';
+import { Credential, Resource, LiveSession, Graph, Output, SchemaSnapshotV1, SnapshotV1, Organization, SchemaSourceV1 } from '@renderless/contracts';
 import { config } from '../config';
 
 export interface IStore<T> {
@@ -14,7 +14,7 @@ export interface IStore<T> {
 }
 
 class InMemoryStore<T extends { id: string; orgId: string }> implements IStore<T> {
-  private items: Map<string, T> = new Map();
+  protected items: Map<string, T> = new Map();
 
   async list(orgId: string): Promise<T[]> {
     return Array.from(this.items.values()).filter(i => i.orgId === orgId);
@@ -66,12 +66,62 @@ class InMemoryStore<T extends { id: string; orgId: string }> implements IStore<T
   }
 }
 
+// Specialization for Schemas to handle indexing
+class SchemaStore extends InMemoryStore<SchemaSnapshotV1> {
+  // ITEM 15: Map of source handle -> latest schema ID
+  // handle format: "output:{id}" or "topic:{name}"
+  private latestSourceMap = new Map<string, string>();
+
+  private getSourceHandle(source?: SchemaSourceV1): string | null {
+    if (!source) return null;
+    if (source.kind === 'output') return `output:${source.outputId}`;
+    if (source.kind === 'topic') return `topic:${source.topic}`;
+    if (source.kind === 'graph') return `graph:${source.graphId}`;
+    return null;
+  }
+
+  async create(orgId: string, data: SchemaSnapshotV1): Promise<SchemaSnapshotV1> {
+    const result = await super.create(orgId, data);
+    const handle = this.getSourceHandle(data.source);
+    if (handle) {
+      const currentLatestId = this.latestSourceMap.get(handle);
+      const currentLatest = currentLatestId ? this.items.get(currentLatestId) : null;
+      
+      // If none exists or new one is newer, update index
+      if (!currentLatest || data.createdAt >= currentLatest.createdAt) {
+        this.latestSourceMap.set(handle, data.id);
+      }
+    }
+    return result;
+  }
+
+  getLatestBySource(orgId: string, source: SchemaSourceV1): SchemaSnapshotV1 | null {
+    const handle = this.getSourceHandle(source);
+    if (!handle) return null;
+    const id = this.latestSourceMap.get(handle);
+    if (!id) return null;
+    const item = this.items.get(id);
+    return item && item.orgId === orgId ? item : null;
+  }
+
+  async listBySource(orgId: string, source: SchemaSourceV1): Promise<SchemaSnapshotV1[]> {
+    const all = await this.list(orgId);
+    return all.filter(s => {
+      if (!s.source || s.source.kind !== source.kind) return false;
+      if (s.source.kind === 'output' && source.kind === 'output') return s.source.outputId === source.outputId;
+      if (s.source.kind === 'topic' && source.kind === 'topic') return s.source.topic === source.topic;
+      if (s.source.kind === 'graph' && source.kind === 'graph') return s.source.graphId === source.graphId;
+      return false;
+    }).sort((a, b) => b.createdAt - a.createdAt);
+  }
+}
+
 export const credentialStore = new InMemoryStore<Credential>();
 export const resourceStore = new InMemoryStore<Resource>();
 export const liveSessionStore = new InMemoryStore<LiveSession>();
 export const graphStore = new InMemoryStore<Graph>();
 export const outputStore = new InMemoryStore<Output>();
-export const schemaStore = new InMemoryStore<SchemaSnapshotV1>();
+export const schemaStore = new SchemaStore();
 
 // ITEM 12: Organization Store
 export const orgStore = new InMemoryStore<Organization & { orgId: string }>();
@@ -79,7 +129,7 @@ export const orgStore = new InMemoryStore<Organization & { orgId: string }>();
 // Last-known-value store for topics
 export const ephemeralStateStore = new Map<string, any>();
 
-// Quick lookup for latest schema snapshots
+// Quick lookup for latest schema snapshots (ITEM 15: Migration to schemaStore indexing)
 export const latestOutputSchemaMap = new Map<string, string>(); 
 export const latestTopicSchemaMap = new Map<string, string>();
 

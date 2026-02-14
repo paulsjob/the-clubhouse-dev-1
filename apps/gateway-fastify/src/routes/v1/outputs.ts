@@ -138,7 +138,8 @@ export const outputRoutes: FastifyPluginAsync = async (fastify) => {
         sourceType: "output_run",
         sourceId: id,
         fields,
-        hash
+        hash,
+        source: { kind: 'output', outputId: id } // ITEM 15
       };
 
       await schemaStore.create(request.rl.orgId, snapshot);

@@ -77,7 +77,8 @@ export const streamRoutes: FastifyPluginAsync = async (fastify) => {
         sourceType: "live_topic",
         sourceId: topic,
         fields,
-        hash
+        hash,
+        source: { kind: 'topic', topic } // ITEM 15
       };
 
       await schemaStore.create(orgId, snapshot);
