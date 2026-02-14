@@ -13,8 +13,11 @@ export * from './types/binding';
 export * from './types/bindingSet';
 export * from './types/snapshot';
 export * from './types/org';
-export * from './types/simulation'; // Added in Item 21
+export * from './types/simulation';
 export * from './types/domain/mlbScorebugStateV1';
+export * from './types/engine';
+export * from './types/bus';
+export * from './types/deploy';
 
 // Validators
 export * from './validators/credential';
@@ -29,3 +32,6 @@ export * from './validators/bindingSet';
 export * from './validators/snapshot';
 export * from './validators/org';
 export * from './validators/domain/mlbScorebugStateV1';
+export * from './validators/engine';
+export * from './validators/bus';
+export * from './validators/deploy';

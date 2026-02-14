@@ -23,7 +23,8 @@ import { bindingSetRoutes } from './routes/v1/bindingSets';
 import { simulationRoutes } from './routes/v1/simulations';
 import { busRoutes } from './routes/v1/bus';
 import { deployRoutes } from './routes/v1/deploy';
-import { followRoutes } from './routes/v1/follow'; // ITEM 26
+import { engineRoutes } from './routes/v1/engine'; // ITEM 21
+import { followRoutes } from './routes/v1/follow';
 import { demoRoutes } from './routes/v1/demo';
 import pkg from '../package.json';
 
@@ -41,7 +42,6 @@ export const buildServer = (): FastifyInstance => {
     requestIdHeader: 'x-request-id',
   });
 
-  // ITEM 11: Swagger Registration
   server.register(swagger, {
     openapi: {
       info: {
@@ -115,7 +115,8 @@ export const buildServer = (): FastifyInstance => {
   server.register(simulationRoutes);
   server.register(busRoutes);
   server.register(deployRoutes);
-  server.register(followRoutes); // ITEM 26
+  server.register(engineRoutes); // ITEM 21
+  server.register(followRoutes);
   server.register(demoRoutes);
 
   return server;
