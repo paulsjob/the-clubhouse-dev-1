@@ -1,7 +1,7 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { Credential, Resource, LiveSession, Graph, Output, SchemaSnapshotV1, SnapshotV1, Organization, SchemaSourceV1 } from '@renderless/contracts';
+import { Credential, Resource, LiveSession, Graph, Output, SchemaSnapshotV1, SnapshotV1, Organization, SchemaSourceV1, BindingSetV1 } from '@renderless/contracts';
 import { config } from '../config';
 
 export interface IStore<T> {
@@ -122,6 +122,7 @@ export const liveSessionStore = new InMemoryStore<LiveSession>();
 export const graphStore = new InMemoryStore<Graph>();
 export const outputStore = new InMemoryStore<Output>();
 export const schemaStore = new SchemaStore();
+export const bindingSetStore = new InMemoryStore<BindingSetV1>(); // Added in Item 20
 
 // ITEM 12: Organization Store
 export const orgStore = new InMemoryStore<Organization & { orgId: string }>();

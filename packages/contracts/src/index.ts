@@ -9,7 +9,8 @@ export * from './types/output';
 export * from './types/liveSession';
 export * from './types/topic';
 export * from './types/schema';
-export * from './types/binding'; // Added in Item 16
+export * from './types/binding';
+export * from './types/bindingSet'; // Added in Item 20
 export * from './types/snapshot';
 export * from './types/org';
 export * from './types/domain/mlbScorebugStateV1';
@@ -22,7 +23,8 @@ export * from './validators/output';
 export * from './validators/liveSession';
 export * from './validators/topic';
 export * from './validators/schema';
-export * from './validators/binding'; // Added in Item 16
+export * from './validators/binding';
+export * from './validators/bindingSet'; // Added in Item 20
 export * from './validators/snapshot';
 export * from './validators/org';
 export * from './validators/domain/mlbScorebugStateV1';
