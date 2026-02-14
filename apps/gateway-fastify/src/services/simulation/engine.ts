@@ -4,7 +4,8 @@ import { ephemeralStateStore } from '../storage';
 import { MLBScorebugStateV1 } from '@renderless/contracts';
 
 interface ActiveSim {
-  timer: NodeJS.Timeout;
+  // --- Fix: Use ReturnType<typeof setInterval> to avoid dependency on NodeJS namespace ---
+  timer: ReturnType<typeof setInterval>;
   ticks: number;
   topic: string;
   config: any;

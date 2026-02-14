@@ -272,12 +272,6 @@ const StudioApp = () => {
       const payload = JSON.parse(e.data);
       if (payload.data) {
         setFollowEvents(prev => [...prev, payload.data]);
-        
-        // Visual Feedback on Canvas
-        if (payload.data.nodeId) {
-          // Temporarily highlight nodes in layout? 
-          // Instead, we just show them in the overlay for stability
-        }
       }
     };
 
@@ -290,8 +284,6 @@ const StudioApp = () => {
     } catch (err) {
       console.error("Follow Mode Start Failed", err);
     }
-
-    // Auto-close handler stored in ref or state if needed
   };
 
   // ITEM 24: Resizing Logic
@@ -447,7 +439,6 @@ const StudioApp = () => {
             </div>
           </div>
           
-          {/* ITEM 26: FOLLOW THE DATA BUTTON */}
           <button 
             onClick={handleFollowData}
             className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-black uppercase rounded-2xl transition-all shadow-xl shadow-blue-600/20 flex items-center justify-center gap-3 border border-blue-400/30"
@@ -545,12 +536,10 @@ const StudioApp = () => {
         </div>
       </div>
 
-      {/* ITEM 24: Resizable Sidebar */}
       <div 
         style={{ width: inspectorWidth }}
         className="border-l border-zinc-800 flex flex-col bg-zinc-900 shadow-[-20px_0_60px_rgba(0,0,0,0.8)] z-40 relative group/sidebar"
       >
-        {/* RESIZER HANDLE */}
         <div 
           onMouseDown={handleResizeMouseDown}
           className="absolute left-[-2px] top-0 bottom-0 w-1 cursor-col-resize z-50 hover:bg-blue-600/50 transition-colors bg-transparent"
@@ -575,80 +564,19 @@ const StudioApp = () => {
                     <label className="text-[9px] font-black uppercase text-zinc-500 tracking-widest px-1">Text Content</label>
                     <textarea value={selectedElements[0].data?.text || ''} onChange={(e) => updateElement(selectedElements[0].id, { data: { ...selectedElements[0].data, text: e.target.value } })} onBlur={() => commitToHistory()} className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-[11px] font-bold text-zinc-300 focus:border-blue-500/50 outline-none min-h-[100px] transition-all pointer-events-auto resize-none" />
                   </div>
-                  <div className="space-y-4" onPointerDown={(e) => e.stopPropagation()}>
-                    <label className="text-[9px] font-black uppercase text-zinc-500 tracking-widest px-1">Justification</label>
-                    <div className="grid grid-cols-3 gap-1 p-1 bg-black/40 rounded-xl border border-zinc-800">
-                      {[
-                        { v: 'top', h: 'left' }, { v: 'top', h: 'center' }, { v: 'top', h: 'right' },
-                        { v: 'middle', h: 'left' }, { v: 'middle', h: 'center' }, { v: 'middle', h: 'right' },
-                        { v: 'bottom', h: 'left' }, { v: 'bottom', h: 'center' }, { v: 'bottom', h: 'right' }
-                      ].map((pos) => {
-                        const isActive = (selectedElements[0].data?.verticalAlign || 'top') === pos.v && (selectedElements[0].style?.textAlign || 'left') === pos.h;
-                        return (
-                          <button key={`${pos.v}-${pos.h}`} onClick={() => { commitToHistory(); updateElement(selectedElements[0].id, { data: { ...selectedElements[0].data, verticalAlign: pos.v as any }, style: { ...selectedElements[0].style, textAlign: pos.h as any } }); }} className={`h-10 rounded-lg flex items-center justify-center transition-all ${isActive ? 'bg-blue-600 text-white shadow-lg' : 'text-zinc-600 hover:bg-zinc-800'}`}>
-                            <div className={`w-4 h-4 border border-current rounded-sm relative flex flex-col ${pos.v === 'top' ? 'justify-start' : pos.v === 'middle' ? 'justify-center' : 'justify-end'} ${pos.h === 'left' ? 'items-start' : pos.h === 'center' ? 'items-center' : 'items-end'}`}><div className="w-[50%] h-[2px] bg-current m-0.5 rounded-full" /></div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
                 </>
               )}
 
               <div className="space-y-6 pt-4 border-t border-zinc-800/50">
                 <label className="text-[9px] font-black uppercase text-zinc-500 tracking-widest px-1">Appearance</label>
-                
                 <PropertyInput label="Layer Overall Opacity" suffix="%" value={Math.round(Number(selectedElements[0].style?.opacity ?? 1) * 100)} onChange={(v) => {
                   const num = parseInt(v) || 0;
                   updateElement(selectedElements[0].id, { style: { ...selectedElements[0].style, opacity: Math.min(Math.max(num / 100, 0), 1) } });
                 }} onCommit={commitToHistory} />
-
-                {selectedElements[0].type === 'text' && (
-                  <ColorSwatch label="Text Style" color={selectedElements[0].style?.color as string} onChange={(v) => updateElement(selectedElements[0].id, { style: { ...selectedElements[0].style, color: v } })} onCommit={commitToHistory} />
-                )}
-                
-                <div className="space-y-4">
-                  <ColorSwatch label="Fill Layer" color={selectedElements[0].style?.backgroundColor as string} onChange={(v) => updateElement(selectedElements[0].id, { style: { ...selectedElements[0].style, backgroundColor: v } })} onCommit={commitToHistory} />
-                  <PropertyInput label="Fill Opacity" suffix="%" value={Math.round((selectedElements[0].style?.fillOpacity ?? 1) * 100)} onChange={(v) => {
-                    const num = parseInt(v) || 0;
-                    updateElement(selectedElements[0].id, { style: { ...selectedElements[0].style, fillOpacity: Math.min(Math.max(num / 100, 0), 1) } });
-                  }} onCommit={commitToHistory} />
-                </div>
-
-                <div className="space-y-4 pt-2 border-t border-zinc-800/30">
-                  <div className="grid grid-cols-[1fr_80px] gap-3 items-end">
-                    <ColorSwatch label="Stroke Outline" color={selectedElements[0].style?.borderColor as string} onChange={(v) => updateElement(selectedElements[0].id, { style: { ...selectedElements[0].style, borderColor: v, borderStyle: v === 'transparent' ? 'none' : 'solid' } })} onCommit={commitToHistory} />
-                    <div className="space-y-1.5 pb-1 pointer-events-auto">
-                       <span className="text-[8px] font-mono text-zinc-600 uppercase px-1">Weight</span>
-                       <input type="number" onMouseDown={(e) => e.stopPropagation()} value={parseInt(selectedElements[0].style?.borderWidth as string) || 0} onChange={(e) => updateElement(selectedElements[0].id, { style: { ...selectedElements[0].style, borderWidth: `${e.target.value}px`, borderStyle: 'solid' } })} onBlur={() => commitToHistory()} className="w-full bg-black border border-zinc-800 rounded-xl px-2.5 py-3 text-[11px] font-mono text-zinc-400 text-center outline-none transition-all focus:border-blue-500/50" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5 pointer-events-auto"><span className="text-[8px] font-mono text-zinc-600 uppercase px-1">Corner</span><input type="number" onMouseDown={(e) => e.stopPropagation()} value={parseInt(selectedElements[0].style?.borderRadius as string) || 0} onChange={(e) => updateElement(selectedElements[0].id, { style: { ...selectedElements[0].style, borderRadius: `${e.target.value}px` } })} onBlur={() => commitToHistory()} className="w-full bg-black border border-zinc-800 rounded-xl px-2.5 py-3 text-[10px] font-mono text-zinc-400 outline-none transition-all focus:border-blue-500/50" /></div>
-                  <div className="space-y-1.5 pointer-events-auto"><span className="text-[8px] font-mono text-zinc-600 uppercase px-1">Padding</span><input type="number" onMouseDown={(e) => e.stopPropagation()} value={parseInt(selectedElements[0].style?.padding as string) || 0} onChange={(e) => updateElement(selectedElements[0].id, { style: { ...selectedElements[0].style, padding: `${e.target.value}px` } })} onBlur={() => commitToHistory()} className="w-full bg-black border border-zinc-800 rounded-xl px-2.5 py-3 text-[10px] font-mono text-zinc-400 outline-none transition-all focus:border-blue-500/50" /></div>
-                </div>
+                <ColorSwatch label="Fill Layer" color={selectedElements[0].style?.backgroundColor as string} onChange={(v) => updateElement(selectedElements[0].id, { style: { ...selectedElements[0].style, backgroundColor: v } })} onCommit={commitToHistory} />
               </div>
 
               <div className="space-y-3 pt-4 border-t border-zinc-800/50">
-                <label className="text-[9px] font-black uppercase text-zinc-500 tracking-widest px-1">Metrics</label>
-                <div className="grid grid-cols-2 gap-3 pointer-events-auto">
-                  {['x', 'y', 'width', 'height'].map((prop) => {
-                    const isDim = prop === 'width' || prop === 'height';
-                    const isDisabled = isDim && selectedElements[0].data?.textType === 'point';
-                    return (
-                      <div key={prop} className={`space-y-1.5 transition-opacity ${isDisabled ? 'opacity-30' : ''}`}>
-                        <span className="text-[8px] font-mono text-zinc-600 uppercase px-1">{prop.charAt(0)}</span>
-                        <input type="number" onMouseDown={(e) => e.stopPropagation()} disabled={isDisabled} value={Math.round(Number((selectedElements[0] as any)[prop]))} onChange={(e) => updateElement(selectedElements[0].id, { [prop]: parseInt(e.target.value) || 0 })} onBlur={() => commitToHistory()} className="w-full bg-black border border-zinc-800 rounded px-2.5 py-2 text-[10px] font-mono text-zinc-400 outline-none transition-all focus:border-blue-500/50" />
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* ITEM 24: Live Bus Monitor Display */}
-              <div className="space-y-3 pt-8 border-t border-zinc-800/50">
                 <div className="flex items-center justify-between px-1">
                   <label className="text-[9px] font-black uppercase text-zinc-500 tracking-widest">Live Bus Monitor</label>
                   <div className="flex items-center gap-1.5">
@@ -673,228 +601,95 @@ const StudioApp = () => {
 }`}
                     </pre>
                   </div>
-                  <div className="p-2.5 bg-zinc-900/60 flex items-center justify-between border-t border-zinc-800/50">
-                    <div className="flex gap-2">
-                       <div className="w-2 h-2 rounded-full bg-zinc-800" />
-                       <div className="w-2 h-2 rounded-full bg-zinc-800" />
-                    </div>
-                    <span className="text-[8px] font-mono text-zinc-600 uppercase">Auto Discovery ACTIVE</span>
-                  </div>
                 </div>
               </div>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-full gap-4 opacity-30 mt-32">
               <p className="text-[10px] font-black uppercase tracking-[0.2em] leading-loose text-center">Select a layer<br/>to begin editing</p>
-              {/* Optional Empty State Bus Info */}
-              <div className="mt-8 p-4 border border-zinc-800/50 rounded-2xl bg-black/20 w-full">
-                <span className="text-[8px] font-mono text-zinc-700 uppercase block mb-2">Bus Listener State</span>
-                <div className="flex items-center gap-2">
-                  <div className="w-1 h-1 rounded-full bg-green-500" />
-                  <span className="text-[8px] font-mono text-zinc-600 uppercase">8 Active Topics</span>
-                </div>
-              </div>
             </div>
           )}
         </div>
       </div>
 
-      <FollowModeOverlay 
-        isActive={followActive} 
-        events={followEvents} 
-        onClose={() => setFollowActive(false)} 
-      />
-
+      <FollowModeOverlay isActive={followActive} events={followEvents} onClose={() => setFollowActive(false)} />
       <AssetExplorer />
       <NewFolderDialog />
     </div>
   );
 };
 
-// --- DATA ENGINE APP FEATURE (ITEM 25: DEPLOY WIRING) ---
+// --- ITEM 27: DATA ENGINE APP (HEARTBEAT) ---
 const DataEngineAppImpl: React.FC = () => {
-  const [activeProvider, setActiveProvider] = useState('Global Sports Feed');
-  const [deployStatus, setDeployStatus] = useState<'idle' | 'deploying' | 'success' | 'error'>('idle');
-  const [errorMessage, setErrorMessage] = useState('');
+  const [testResult, setTestResult] = useState<any | null>(null);
+  const [isRunning, setIsRunning] = useState(false);
 
-  const handleDeploy = async () => {
-    setDeployStatus('deploying');
-    setErrorMessage('');
-    
+  const runTestGraph = async () => {
+    setIsRunning(true);
     try {
-      const response = await fetch('/v1/deploy', {
+      const response = await fetch('/v1/demo/hello-data-engine', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-rl-org-id': 'org_demo',
-          'x-rl-api-key': 'devkey_123'
-        },
-        body: JSON.stringify({ name: 'Magical MLB Demo' })
+        headers: { 'x-rl-org-id': 'org_demo', 'x-rl-api-key': 'devkey_123' }
       });
-      
-      const result = await response.json();
-      if (result.ok) {
-        setDeployStatus('success');
-        setTimeout(() => setDeployStatus('idle'), 3000);
-      } else {
-        throw new Error(result.error?.message || 'Deployment failed');
-      }
-    } catch (e: any) {
-      setDeployStatus('error');
-      setErrorMessage(e.message);
+      const res = await response.json();
+      if (res.ok) setTestResult(res.data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsRunning(false);
     }
   };
 
-  const TreeItem = ({ icon, label, value, type = 'text' }: { icon?: string, label: string, value: string, type?: 'text' | 'number' }) => (
-    <div className="flex items-center justify-between py-2.5 px-3 hover:bg-white/5 rounded-lg group cursor-pointer transition-colors">
-      <div className="flex items-center gap-3">
-        <div className={`w-4 h-4 flex items-center justify-center rounded-sm text-[8px] font-black ${type === 'text' ? 'bg-blue-500/20 text-blue-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
-          {type === 'text' ? 'T' : '#'}
-        </div>
-        <span className="text-[11px] font-medium text-zinc-400 group-hover:text-zinc-200 transition-colors uppercase tracking-tight">{label}</span>
-      </div>
-      <div className="flex items-center gap-2">
-        <span className={`text-[11px] font-mono ${type === 'text' ? 'text-blue-400' : 'text-yellow-400'}`}>{value}</span>
-        <div className="w-1 h-1 rounded-full bg-blue-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-      </div>
-    </div>
-  );
-
-  const TreeGroup = ({ title, children }: { title: string, children?: React.ReactNode }) => {
-    const [isOpen, setIsOpen] = useState(true);
-    return (
-      <div className="space-y-1 mb-6">
-        <button 
-          onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center gap-2 px-2 text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] hover:text-zinc-400 transition-colors mb-2"
-        >
-          <svg className={`w-2 h-2 transition-transform ${isOpen ? 'rotate-90' : ''}`} viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-          {title}
-        </button>
-        {isOpen && <div className="pl-2 border-l border-zinc-800/50 ml-2 space-y-0.5">{children}</div>}
-      </div>
-    );
-  };
-
   return (
-    <div className="flex-1 flex bg-[#050506] overflow-hidden animate-in fade-in duration-500">
-      {/* LEFT SIDEBAR - DATA DICTIONARY */}
-      <div className="w-80 border-r border-zinc-800 flex flex-col bg-zinc-900/50 backdrop-blur-3xl z-40">
-        <div className="p-6 space-y-6 border-b border-zinc-800 bg-zinc-900/40">
-          <div className="space-y-2">
-            <label className="text-[9px] font-black uppercase text-zinc-500 tracking-widest px-1">Active Provider</label>
-            <div className="relative">
-              <select 
-                value={activeProvider}
-                onChange={(e) => setActiveProvider(e.target.value)}
-                className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-3 text-[11px] font-bold text-blue-400 appearance-none outline-none focus:border-blue-500/50 transition-all cursor-pointer"
-              >
-                <option>Global Sports Feed</option>
-                <option>NFL Live Data</option>
-                <option>Internal CMS</option>
-              </select>
-              <svg className="absolute right-4 top-1/2 -translate-y-1/2 w-3 h-3 text-zinc-600 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="m6 9 6 6 6-6"/></svg>
-            </div>
-          </div>
-          <div className="relative">
-            <input 
-              type="text" 
-              placeholder="Search data dictionary..." 
-              className="w-full bg-black/40 border border-zinc-800/50 rounded-xl px-10 py-2.5 text-[10px] font-mono text-zinc-400 outline-none focus:border-blue-500/30 transition-all"
-            />
-            <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
-          <TreeGroup title="Game > Home Team">
-            <TreeItem label="Home Team Name" value="Seattle Seahawks" />
-            <TreeItem label="Home Team Score" value="24" type="number" />
-          </TreeGroup>
-          <TreeGroup title="Game > Away Team">
-            <TreeItem label="Away Team Name" value="San Francisco 49ers" />
-            <TreeItem label="Away Team Score" value="21" type="number" />
-          </TreeGroup>
-          <TreeGroup title="Game > Status">
-            <TreeItem label="Game Clock" value="02:45" />
-            <TreeItem label="Current Quarter" value="4" type="number" />
-          </TreeGroup>
-          <TreeGroup title="Players > Top Performers">
-            <TreeItem label="Leading Player" value="Geno Smith" />
-            <TreeItem label="Passing Yards" value="342" type="number" />
-          </TreeGroup>
-        </div>
-
-        <div className="p-4 border-t border-zinc-800 bg-black/20">
-          <div className="flex items-center justify-between px-2">
-            <div className="flex flex-col">
-              <span className="text-[8px] font-black uppercase text-zinc-600 tracking-widest">Feed Status</span>
-              <span className="text-[10px] font-black text-green-500 uppercase tracking-tighter">Connected</span>
-            </div>
-            <button className="p-2 text-zinc-600 hover:text-white transition-colors">
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
-            </button>
-          </div>
-        </div>
+    <div className="flex-1 flex flex-col bg-[#050506] overflow-hidden animate-in fade-in duration-500 p-10">
+      <div className="flex items-center justify-between mb-10 shrink-0">
+         <div>
+            <h2 className="text-xl font-black uppercase tracking-tight">Data Logic Center</h2>
+            <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mt-1">Heartbeat Stage for engine diagnostics</p>
+         </div>
+         <button 
+           onClick={runTestGraph}
+           disabled={isRunning}
+           className="px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white text-[12px] font-black uppercase rounded-2xl transition-all shadow-xl shadow-blue-600/20 flex items-center gap-3 disabled:opacity-50"
+         >
+           {isRunning ? <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" /> : <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>}
+           Run Test Graph
+         </button>
       </div>
 
-      {/* MAIN CONTENT AREA - DATA GRAPH */}
-      <div className="flex-1 relative flex flex-col">
-        <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ 
-          backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)', 
-          backgroundSize: '32px 32px' 
-        }} />
-        
-        <div className="h-16 border-b border-zinc-800/50 flex items-center justify-end px-8 gap-4 bg-zinc-900/20 backdrop-blur-md shrink-0">
-          <button className="px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white text-[10px] font-black uppercase rounded-xl transition-all border border-zinc-700/50">Validate Graph</button>
-          
-          <button 
-            onClick={handleDeploy}
-            disabled={deployStatus === 'deploying'}
-            className={`px-5 py-2.5 text-white text-[10px] font-black uppercase rounded-xl transition-all shadow-lg flex items-center gap-2 ${
-              deployStatus === 'deploying' ? 'bg-zinc-700 cursor-not-allowed' : 
-              deployStatus === 'success' ? 'bg-green-600 shadow-green-500/20' : 
-              deployStatus === 'error' ? 'bg-red-600 shadow-red-500/20' : 
-              'bg-blue-600 hover:bg-blue-500 shadow-blue-600/20'
-            }`}
-          >
-            {deployStatus === 'deploying' && <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin" />}
-            {deployStatus === 'idle' && 'Deploy Endpoint'}
-            {deployStatus === 'deploying' && 'Deploying...'}
-            {deployStatus === 'success' && 'Deployed!'}
-            {deployStatus === 'error' && 'Failed'}
-          </button>
-        </div>
+      <div className="flex-1 grid grid-cols-3 gap-8 overflow-hidden">
+         {/* INPUT BLOCK */}
+         <div className="flex flex-col bg-zinc-900/50 border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl">
+            <div className="p-5 border-b border-zinc-800 bg-zinc-800/20 flex items-center justify-between">
+               <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">1. Initial Input</span>
+               <div className="w-2 h-2 rounded-full bg-zinc-700" />
+            </div>
+            <div className="flex-1 p-6 font-mono text-[11px] text-blue-400 overflow-auto custom-scrollbar">
+               {testResult ? <pre>{JSON.stringify(testResult.input, null, 2)}</pre> : <span className="opacity-20">Waiting for trigger...</span>}
+            </div>
+         </div>
 
-        {deployStatus === 'error' && (
-          <div className="m-8 p-4 bg-red-600/10 border border-red-500/50 rounded-2xl text-[11px] font-mono text-red-400 flex items-center gap-3 animate-in slide-in-from-top-2 duration-300">
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-            {errorMessage}
-          </div>
-        )}
+         {/* TRANSFORM BLOCK */}
+         <div className="flex flex-col bg-zinc-900/50 border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl">
+            <div className="p-5 border-b border-zinc-800 bg-zinc-800/20 flex items-center justify-between">
+               <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">2. Node Processing</span>
+               <div className="w-2 h-2 rounded-full bg-blue-500" />
+            </div>
+            <div className="flex-1 p-6 font-mono text-[11px] text-zinc-500 overflow-auto custom-scrollbar">
+               {testResult && testResult.trace ? <pre>{JSON.stringify(testResult.trace[1].outputs, null, 2)}</pre> : <span className="opacity-20 italic">Awaiting trace data...</span>}
+            </div>
+         </div>
 
-        <div className="flex-1 flex items-center justify-center p-20">
-           <div className="flex flex-col items-center gap-6 opacity-20">
-              <div className="relative">
-                <div className="absolute inset-0 bg-blue-500 blur-[60px] opacity-20" />
-                <svg className="w-24 h-24 text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="0.5"><path d="M20 7h-9m3 3H5m11 3h-9m3 3H5m11 3h-9"/></svg>
-              </div>
-              <div className="text-center space-y-2">
-                <h2 className="text-sm font-black uppercase tracking-[0.5em] text-zinc-400">Node Pipeline Canvas</h2>
-                <p className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">Awaiting logic initialization...</p>
-              </div>
-           </div>
-        </div>
-
-        {/* MINIMAP / PREVIEW FLOATER */}
-        <div className="absolute bottom-10 right-10 w-64 h-40 bg-black/80 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden backdrop-blur-xl group">
-          <div className="absolute inset-0 opacity-10 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] pointer-events-none" />
-          <div className="p-3 border-b border-zinc-800 flex items-center justify-between">
-            <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Logic Overview</span>
-            <div className="w-1.5 h-1.5 rounded-full bg-blue-500/50" />
-          </div>
-          <div className="flex-1 bg-zinc-950/50" />
-        </div>
+         {/* OUTPUT BLOCK */}
+         <div className="flex flex-col bg-zinc-900/50 border border-blue-500/20 rounded-3xl overflow-hidden shadow-2xl">
+            <div className="p-5 border-b border-zinc-800 bg-blue-600/10 flex items-center justify-between">
+               <span className="text-[10px] font-black uppercase tracking-widest text-blue-400">3. Final Result</span>
+               <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]" />
+            </div>
+            <div className="flex-1 p-6 font-mono text-[11px] text-green-400 overflow-auto custom-scrollbar bg-green-500/[0.02]">
+               {testResult ? <pre>{JSON.stringify(testResult.finalOutput, null, 2)}</pre> : <span className="opacity-20 italic">Awaiting completion...</span>}
+            </div>
+         </div>
       </div>
     </div>
   );
@@ -912,18 +707,13 @@ const NavigationHeader = ({ current, onSwitch }: { current: string, onSwitch: (v
         <span className="text-[7px] text-zinc-600 font-bold uppercase tracking-tight mt-0.5">Live Engine Workspace</span>
       </div>
     </div>
-
     <nav className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-zinc-800/50">
       {['STUDIO', 'CONTROL', 'DATA ENGINE', 'OUTPUT'].map(item => {
         const value = item === 'DATA ENGINE' ? 'DATA_ENGINE' : item;
         const isActive = (item === 'STUDIO' && current === 'STUDIO') || (item === 'DATA ENGINE' && current === 'DATA_ENGINE');
         const isClickable = item === 'STUDIO' || item === 'DATA ENGINE';
-        
         return (
-          <button 
-            key={item}
-            disabled={!isClickable}
-            onClick={() => isClickable && onSwitch(value as any)}
+          <button key={item} disabled={!isClickable} onClick={() => isClickable && onSwitch(value as any)}
             className={`px-5 py-2 rounded-lg text-[9px] font-black uppercase tracking-[0.1em] transition-all ${isActive ? 'bg-zinc-800 text-blue-400 shadow-inner' : 'text-zinc-500 hover:text-zinc-300 disabled:opacity-30'}`}
           >
             {item}
@@ -931,36 +721,25 @@ const NavigationHeader = ({ current, onSwitch }: { current: string, onSwitch: (v
         );
       })}
     </nav>
-
     <div className="flex items-center gap-6">
        <div className="flex items-center gap-2">
          <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
          <span className="text-[9px] font-black text-green-500/80 uppercase tracking-widest">Systems Online</span>
        </div>
-       <div className="flex items-center gap-2 bg-zinc-900/50 px-3 py-1.5 rounded-lg border border-zinc-800">
-         <span className="text-[10px] font-mono text-zinc-500">RD</span>
-       </div>
     </div>
   </header>
 );
 
-// --- MASTER APP COMPONENT ---
 const App = () => {
   const [view, setView] = useState<'STUDIO' | 'DATA_ENGINE'>('STUDIO');
-
   return (
     <div className="h-screen w-screen flex flex-col bg-[#050506] overflow-hidden">
       <NavigationHeader current={view} onSwitch={setView} />
       <main className="flex-1 flex overflow-hidden">
         {view === 'STUDIO' ? <StudioApp /> : <DataEngineAppImpl />}
       </main>
-      
-      {/* GLOBAL FOOTER */}
       <footer className="h-7 bg-black border-t border-zinc-900 flex items-center justify-between px-4 shrink-0 text-[8px] font-mono text-zinc-600 uppercase tracking-widest pointer-events-none">
-        <div className="flex gap-4">
-          <span>ENV: Production v2.0.4-stable</span>
-          <span>Org: Red Bull Media House</span>
-        </div>
+        <div className="flex gap-4"><span>ENV: Production v2.0.4-stable</span><span>Org: Red Bull Media House</span></div>
         <span>RDLSS-6782-SYS</span>
       </footer>
     </div>

@@ -1,10 +1,12 @@
 
+import 'fastify';
 import { FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
 import { config } from '../config';
 import { wrapError } from '../utils/responses';
 import { orgStore } from '../services/storage';
 
+// --- Fix: Ensure module augmentation works by having an import 'fastify' statement ---
 declare module 'fastify' {
   interface FastifyRequest {
     rl: {

@@ -189,7 +189,8 @@ export async function importOrgSnapshot(orgId: string, snapshot: SnapshotV1, mod
 
 // ITEM 10 / 13: Persistence Manager
 export class PersistenceManager {
-  private static saveTimers: Map<string, NodeJS.Timeout> = new Map();
+  // --- Fix: Use ReturnType<typeof setTimeout> to avoid dependency on NodeJS namespace ---
+  private static saveTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   private static SYSTEM_ID = '_system'; // Special ID for global metadata like orgs
 
   static markDirty(orgId: string) {
