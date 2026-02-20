@@ -28,7 +28,9 @@ interface AssetsState {
   uploadFiles: (files: FileList) => Promise<void>;
   createFolder: (name: string) => Promise<void>;
   deleteAsset: (id: string) => Promise<void>;
-  updateFolderPermissions: (folderId: string, permissions: string[]) => Promise<void>;
+  updateFolderPermissions: (folderId: string, permissions: Folder['permissions']) => Promise<void>;
+  shareFolder: (folderId: string, email: string, role: 'read' | 'write' | 'admin') => Promise<void>;
+  unshareFolder: (folderId: string, userId: string) => Promise<void>;
 }
 
 export const useAssetsStore = create<AssetsState>((set, get) => ({
@@ -52,7 +54,11 @@ export const useAssetsStore = create<AssetsState>((set, get) => ({
         assetDb.getAllFolders()
       ]);
       
-      const normalizedFolders = folders.map(f => ({ ...f, parentId: f.parentId || null }));
+      const normalizedFolders = folders.map(f => ({ 
+        ...f, 
+        parentId: f.parentId || null,
+        permissions: f.permissions || { sharedWith: [], isPublic: false }
+      }));
       const normalizedAssets = assets.map(a => ({ ...a, folderId: a.folderId || null }));
 
       for (const asset of normalizedAssets) {
@@ -126,7 +132,7 @@ export const useAssetsStore = create<AssetsState>((set, get) => ({
         parentId: parentId,
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        permissions: { entries: [] }
+        permissions: { sharedWith: [], isPublic: false }
       };
       
       await assetDb.saveFolder(folder);
@@ -150,12 +156,63 @@ export const useAssetsStore = create<AssetsState>((set, get) => ({
     }
   },
 
-  updateFolderPermissions: async (folderId, entries) => {
+  updateFolderPermissions: async (folderId, permissions) => {
     const folders = get().folders.map(f => 
-      f.id === folderId ? { ...f, permissions: { entries } } : f
+      f.id === folderId ? { ...f, permissions } : f
     );
     const folder = folders.find(f => f.id === folderId);
     if (folder) await assetDb.saveFolder(folder);
     set({ folders });
+  },
+
+  shareFolder: async (folderId, email, role) => {
+    const folders = get().folders;
+    const folder = folders.find(f => f.id === folderId);
+    if (!folder) return;
+
+    const newSharedWith = [...(folder.permissions?.sharedWith || [])];
+    const existingIndex = newSharedWith.findIndex(s => s.email === email);
+    
+    if (existingIndex >= 0) {
+      newSharedWith[existingIndex] = { ...newSharedWith[existingIndex], role };
+    } else {
+      newSharedWith.push({
+        id: 'user-' + Math.random().toString(36).substr(2, 5),
+        email,
+        role
+      });
+    }
+
+    const updatedFolder = {
+      ...folder,
+      permissions: {
+        ...folder.permissions,
+        sharedWith: newSharedWith
+      }
+    };
+
+    await assetDb.saveFolder(updatedFolder);
+    set(state => ({
+      folders: state.folders.map(f => f.id === folderId ? updatedFolder : f)
+    }));
+  },
+
+  unshareFolder: async (folderId, userId) => {
+    const folders = get().folders;
+    const folder = folders.find(f => f.id === folderId);
+    if (!folder) return;
+
+    const updatedFolder = {
+      ...folder,
+      permissions: {
+        ...folder.permissions,
+        sharedWith: (folder.permissions?.sharedWith || []).filter(s => s.id !== userId)
+      }
+    };
+
+    await assetDb.saveFolder(updatedFolder);
+    set(state => ({
+      folders: state.folders.map(f => f.id === folderId ? updatedFolder : f)
+    }));
   }
 }));

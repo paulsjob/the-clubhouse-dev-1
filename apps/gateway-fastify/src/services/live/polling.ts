@@ -16,8 +16,7 @@ interface MockGameState {
 }
 
 class PollingService {
-  // --- Fix: Use ReturnType<typeof setInterval> to avoid dependency on NodeJS namespace ---
-  private timers: Map<string, ReturnType<typeof setInterval>> = new Map();
+  private timers: Map<string, NodeJS.Timeout> = new Map();
   // ITEM 18: Transient state for mock games
   private mockStates: Map<string, MockGameState> = new Map();
 

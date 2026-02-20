@@ -10,7 +10,6 @@ interface SSEConnection {
 class PubSubService {
   private connections: Set<SSEConnection> = new Set();
   private sequences: Map<string, number> = new Map();
-  private pausedTopics: Set<string> = new Set();
 
   constructor() {
     // Keep connections alive
@@ -28,39 +27,10 @@ class PubSubService {
     // Initial SSE headers handled in route
   }
 
-  pause(orgId: string, topic: string) {
-    this.pausedTopics.add(`${orgId}:${topic}`);
-  }
-
-  resume(orgId: string, topic: string) {
-    this.pausedTopics.delete(`${orgId}:${topic}`);
-  }
-
-  isPaused(orgId: string, topic: string): boolean {
-    return this.pausedTopics.has(`${orgId}:${topic}`);
-  }
-
-  getSubscriberCount(orgId: string, topic: string): number {
-    let count = 0;
-    for (const conn of this.connections) {
-      if (conn.orgId === orgId && (conn.topic === topic || conn.topic === '*')) {
-        count++;
-      }
-    }
-    return count;
-  }
-
   publish(orgId: string, topic: string, data: any) {
     const seqKey = `${orgId}:${topic}`;
-    
-    // Always advance sequence even if paused so state is consistent when resumed
     const seq = (this.sequences.get(seqKey) || 0) + 1;
     this.sequences.set(seqKey, seq);
-
-    // Flow control: If topic is paused, don't broadcast to clients
-    if (this.isPaused(orgId, topic)) {
-      return;
-    }
 
     const payload = JSON.stringify({
       ts: Date.now(),

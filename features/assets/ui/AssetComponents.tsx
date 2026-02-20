@@ -133,8 +133,13 @@ export const FolderCard: React.FC<{
   return (
     <div 
       onClick={onClick}
-      className="flex flex-col items-center justify-center aspect-square bg-zinc-800/40 border border-zinc-800 rounded-xl cursor-pointer hover:border-zinc-500 hover:bg-zinc-800 transition-all group"
+      className="flex flex-col items-center justify-center aspect-square bg-zinc-800/40 border border-zinc-800 rounded-xl cursor-pointer hover:border-zinc-500 hover:bg-zinc-800 transition-all group relative"
     >
+      {folder.permissions?.sharedWith?.length > 0 && (
+        <div className="absolute top-2 left-2 p-1 bg-blue-600/20 rounded-md">
+          <svg className="w-3 h-3 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>
+        </div>
+      )}
       <svg className="w-10 h-10 text-zinc-600 group-hover:text-blue-400 transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
       </svg>

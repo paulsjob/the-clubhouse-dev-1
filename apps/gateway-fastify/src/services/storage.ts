@@ -1,12 +1,7 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { 
-  Credential, Resource, LiveSession, Graph, Output, 
-  SchemaSnapshotV1, SnapshotV1, Organization, 
-  SchemaSourceV1, BindingSetV1, BusEventV1, DeployResponseV1,
-  EngineTraceEventV1
-} from '@renderless/contracts';
+import { Credential, Resource, LiveSession, Graph, Output, SchemaSnapshotV1, SnapshotV1, Organization, SchemaSourceV1 } from '@renderless/contracts';
 import { config } from '../config';
 
 export interface IStore<T> {
@@ -73,6 +68,8 @@ class InMemoryStore<T extends { id: string; orgId: string }> implements IStore<T
 
 // Specialization for Schemas to handle indexing
 class SchemaStore extends InMemoryStore<SchemaSnapshotV1> {
+  // ITEM 15: Map of source handle -> latest schema ID
+  // handle format: "output:{id}" or "topic:{name}"
   private latestSourceMap = new Map<string, string>();
 
   private getSourceHandle(source?: SchemaSourceV1): string | null {
@@ -89,6 +86,8 @@ class SchemaStore extends InMemoryStore<SchemaSnapshotV1> {
     if (handle) {
       const currentLatestId = this.latestSourceMap.get(handle);
       const currentLatest = currentLatestId ? this.items.get(currentLatestId) : null;
+      
+      // If none exists or new one is newer, update index
       if (!currentLatest || data.createdAt >= currentLatest.createdAt) {
         this.latestSourceMap.set(handle, data.id);
       }
@@ -117,50 +116,24 @@ class SchemaStore extends InMemoryStore<SchemaSnapshotV1> {
   }
 }
 
-/**
- * ITEM 21: Live Bus Store (Append-only, cap at 500 per org)
- */
-class BusStore {
-  private events: Map<string, BusEventV1[]> = new Map();
-
-  async list(orgId: string, topic?: string): Promise<BusEventV1[]> {
-    const orgEvents = this.events.get(orgId) || [];
-    if (topic) {
-      return orgEvents.filter(e => e.topic === topic);
-    }
-    return orgEvents;
-  }
-
-  async create(orgId: string, event: BusEventV1): Promise<BusEventV1> {
-    const orgEvents = this.events.get(orgId) || [];
-    orgEvents.push(event);
-    if (orgEvents.length > 500) {
-      orgEvents.shift();
-    }
-    this.events.set(orgId, orgEvents);
-    return event;
-  }
-}
-
 export const credentialStore = new InMemoryStore<Credential>();
 export const resourceStore = new InMemoryStore<Resource>();
 export const liveSessionStore = new InMemoryStore<LiveSession>();
 export const graphStore = new InMemoryStore<Graph>();
 export const outputStore = new InMemoryStore<Output>();
 export const schemaStore = new SchemaStore();
-export const bindingSetStore = new InMemoryStore<BindingSetV1>();
+
+// ITEM 12: Organization Store
 export const orgStore = new InMemoryStore<Organization & { orgId: string }>();
 
-// ITEM 21
-export const busStore = new BusStore();
-export type DeployRecord = (DeployResponseV1 & { orgId: string }) & { id: string };
-export const deployStore = new InMemoryStore<DeployRecord>();
-export const traceStore = new Map<string, EngineTraceEventV1[]>();
-
+// Last-known-value store for topics
 export const ephemeralStateStore = new Map<string, any>();
+
+// Quick lookup for latest schema snapshots (ITEM 15: Migration to schemaStore indexing)
 export const latestOutputSchemaMap = new Map<string, string>(); 
 export const latestTopicSchemaMap = new Map<string, string>();
 
+// ITEM 09 / 13: Snapshot Helpers
 export async function exportOrgSnapshot(orgId: string, includeSecrets: boolean): Promise<SnapshotV1> {
   const [credentials, resources, graphs, outputs, liveSessions, schemas] = await Promise.all([
     credentialStore.list(orgId),
@@ -200,7 +173,7 @@ export async function importOrgSnapshot(orgId: string, snapshot: SnapshotV1, mod
   const tasks: Promise<any>[] = [
     ...snapshot.credentials.map(item => credentialStore.create(orgId, { ...item, orgId })),
     ...snapshot.resources.map(item => resourceStore.create(orgId, { ...item, orgId })),
-    ...snapshot.graphs.map(item => graphStore.list(orgId).then(() => graphStore.create(orgId, { ...item, orgId }))),
+    ...snapshot.graphs.map(item => graphStore.create(orgId, { ...item, orgId })),
     ...snapshot.outputs.map(item => outputStore.create(orgId, { ...item, orgId })),
     ...snapshot.liveSessions.map(item => liveSessionStore.create(orgId, { ...item, orgId })),
     ...snapshot.schemas.map(item => schemaStore.create(orgId, { ...item, orgId })),
@@ -213,34 +186,53 @@ export async function importOrgSnapshot(orgId: string, snapshot: SnapshotV1, mod
   await Promise.all(tasks);
 }
 
+// ITEM 10 / 13: Persistence Manager
 export class PersistenceManager {
-  private static saveTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
-  private static SYSTEM_ID = '_system';
+  private static saveTimers: Map<string, NodeJS.Timeout> = new Map();
+  private static SYSTEM_ID = '_system'; // Special ID for global metadata like orgs
 
   static markDirty(orgId: string) {
     if (!config.persistEnabled) return;
-    const targetId = orgId;
+    
+    // If it's an org record, we also mark the system dirty
+    const targetId = orgId === PersistenceManager.SYSTEM_ID ? orgId : orgId;
+    
     if (this.saveTimers.has(targetId)) {
       clearTimeout(this.saveTimers.get(targetId)!);
     }
+
     const timer = setTimeout(() => {
       this.saveOrg(targetId);
     }, 500);
+
     this.saveTimers.set(targetId, timer);
   }
 
   private static async saveOrg(targetId: string) {
     this.saveTimers.delete(targetId);
+    
     try {
       let data: SnapshotV1;
+      
       if (targetId === PersistenceManager.SYSTEM_ID) {
+        // Special case: save all organizations globally
         const organizations = await orgStore.getAllGlobal();
-        data = { credentials: [], resources: [], graphs: [], outputs: [], liveSessions: [], schemas: [], organizations };
+        data = {
+          credentials: [],
+          resources: [],
+          graphs: [],
+          outputs: [],
+          liveSessions: [],
+          schemas: [],
+          organizations
+        };
       } else {
         data = await exportOrgSnapshot(targetId, config.persistIncludeSecrets);
       }
+
       const filePath = path.join(config.persistDir, `${targetId}.json`);
       const tmpPath = `${filePath}.tmp`;
+
       await fs.mkdir(config.persistDir, { recursive: true });
       await fs.writeFile(tmpPath, JSON.stringify(data, null, 2), 'utf8');
       await fs.rename(tmpPath, filePath);
@@ -251,18 +243,25 @@ export class PersistenceManager {
 
   static async init() {
     if (!config.persistEnabled) return;
+
     try {
       await fs.mkdir(config.persistDir, { recursive: true });
       const files = await fs.readdir(config.persistDir);
       const orgFiles = files.filter(f => f.endsWith('.json'));
+
+      console.info(`💾 Persistence: Found ${orgFiles.length} persistence files. Loading...`);
+
       for (const file of orgFiles) {
         const targetId = path.basename(file, '.json');
         const filePath = path.join(config.persistDir, file);
+        
         try {
           const content = await fs.readFile(filePath, 'utf8');
           const snapshot = JSON.parse(content) as SnapshotV1;
+          
           const originalPersist = config.persistEnabled;
           (config as any).persistEnabled = false;
+
           if (targetId === PersistenceManager.SYSTEM_ID && snapshot.organizations) {
              for (const org of snapshot.organizations) {
                await orgStore.create(org.id, { ...org, orgId: org.id });
@@ -270,6 +269,7 @@ export class PersistenceManager {
           } else {
             await importOrgSnapshot(targetId, snapshot, 'merge');
           }
+
           (config as any).persistEnabled = originalPersist;
         } catch (loadErr) {
           console.error(`❌ Persistence: Failed to load ${file}`, loadErr);

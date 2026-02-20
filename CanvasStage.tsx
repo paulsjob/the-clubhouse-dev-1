@@ -115,11 +115,13 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
     setDragState({ startX: coords.x, startY: coords.y, initialPositions, hasMoved: false });
   };
 
+  const guideIdCounter = useRef(0);
+
   const handleRulerPointerDown = (e: React.PointerEvent, type: 'h' | 'v') => {
     if (disableInteraction || inlineEditingId) return;
     e.stopPropagation();
     const coords = getStageCoords(e.clientX, e.clientY);
-    const id = `guide-${Date.now()}`;
+    const id = `guide-${guideIdCounter.current++}`;
     const value = type === 'h' ? Math.round(coords.y) : Math.round(coords.x);
     
     const newGuide: Guide = { id, type, value };

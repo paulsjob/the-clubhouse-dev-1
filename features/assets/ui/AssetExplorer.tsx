@@ -6,18 +6,43 @@ import { Breadcrumbs, AssetCard, FolderCard } from './AssetComponents';
 export const AssetExplorer: React.FC = () => {
   const { 
     assets, folders, currentFolderId, viewMode, isExplorerOpen, uploadingCount, filter, initialized,
-    setExplorerOpen, setCurrentFolder, setViewMode, uploadFiles, deleteAsset, updateFolderPermissions, setFilter, init,
-    setNewFolderDialogOpen
+    setExplorerOpen, setCurrentFolder, setViewMode, uploadFiles, deleteAsset, setFilter, init,
+    setNewFolderDialogOpen, shareFolder, unshareFolder
   } = useAssetsStore();
 
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [selectedFolderForShare, setSelectedFolderForShare] = useState<string | null>(null);
+  const [shareEmail, setShareEmail] = useState('');
+  const [shareRole, setShareRole] = useState<'read' | 'write' | 'admin'>('read');
+
+  const getInheritedPermissions = (folderId: string | null) => {
+    const inherited: { user: Folder['permissions']['sharedWith'][0], source: string }[] = [];
+    let currentId = folderId;
+    
+    // Start from parent to get inherited
+    const startFolder = folders.find(f => f.id === folderId);
+    let parentId = startFolder?.parentId || null;
+
+    while (parentId) {
+      const folder = folders.find(f => f.id === parentId);
+      if (folder) {
+        folder.permissions?.sharedWith?.forEach(u => {
+          inherited.push({ user: u, source: folder.name });
+        });
+        parentId = folder.parentId;
+      } else {
+        break;
+      }
+    }
+    return inherited;
+  };
+
+  const selectedFolder = folders.find(f => f.id === selectedFolderForShare);
+  const inheritedPermissions = getInheritedPermissions(selectedFolderForShare);
 
   useEffect(() => {
-    if (isExplorerOpen) init();
-  }, [isExplorerOpen, init]);
-
-  if (!isExplorerOpen) return null;
+    init();
+  }, [init]);
 
   const normCurrentId = currentFolderId || null;
 
@@ -226,52 +251,100 @@ export const AssetExplorer: React.FC = () => {
         </div>
       </div>
       
-      {isShareModalOpen && (
+      {isShareModalOpen && selectedFolder && (
         <div className="fixed inset-0 z-[11000] flex items-center justify-center p-10 bg-black/80 backdrop-blur-md animate-in zoom-in duration-200">
            <div className="bg-zinc-900 border border-zinc-800 rounded-3xl w-full max-w-lg p-10 shadow-[0_30px_100px_rgba(0,0,0,0.8)]">
-              <h3 className="text-xl font-black uppercase tracking-tight mb-2">Workspace Propagation</h3>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xl font-black uppercase tracking-tight">Workspace Propagation</h3>
+                <span className="text-[9px] font-black text-blue-500 bg-blue-500/10 px-2 py-1 rounded uppercase tracking-widest">{selectedFolder.name}</span>
+              </div>
               <p className="text-[11px] font-mono text-zinc-500 mb-8 uppercase tracking-widest leading-relaxed">Modify propagation vectors and visibility for this resource node.</p>
               
-              <div className="space-y-6 mb-10">
+              <div className="space-y-6 mb-10 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
                  <div className="flex flex-col gap-3">
                     <label className="text-[9px] font-black uppercase text-zinc-600 px-1 tracking-widest">Target Handle / Email</label>
                     <div className="flex gap-2">
-                       <input type="text" placeholder="user@renderless.studio" className="flex-1 bg-black border border-zinc-800 rounded-xl px-4 py-3.5 text-xs outline-none focus:border-blue-500 transition-all font-mono" />
-                       <button className="px-4 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-[10px] font-black uppercase text-white transition-all">Invite</button>
+                       <input 
+                        type="text" 
+                        value={shareEmail}
+                        onChange={(e) => setShareEmail(e.target.value)}
+                        placeholder="user@renderless.studio" 
+                        className="flex-1 bg-black border border-zinc-800 rounded-xl px-4 py-3.5 text-xs outline-none focus:border-blue-500 transition-all font-mono" 
+                       />
+                       <select 
+                        value={shareRole}
+                        onChange={(e) => setShareRole(e.target.value as any)}
+                        className="bg-black border border-zinc-800 rounded-xl px-2 text-[10px] font-black uppercase text-zinc-400 outline-none"
+                       >
+                         <option value="read">Read</option>
+                         <option value="write">Write</option>
+                         <option value="admin">Admin</option>
+                       </select>
+                       <button 
+                        onClick={() => {
+                          if (shareEmail) {
+                            shareFolder(selectedFolder.id, shareEmail, shareRole);
+                            setShareEmail('');
+                          }
+                        }}
+                        className="px-4 bg-blue-600 hover:bg-blue-500 rounded-xl text-[10px] font-black uppercase text-white transition-all"
+                       >
+                         Invite
+                       </button>
                     </div>
                  </div>
                  
                  <div className="space-y-2">
                     <h4 className="text-[9px] font-black uppercase text-zinc-600 px-1 tracking-widest">Active Vectors</h4>
-                    <div className="flex items-center justify-between p-4 bg-black/40 rounded-2xl border border-zinc-800">
-                       <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-[10px] font-black">DT</div>
-                          <span className="text-xs font-bold text-zinc-300">Design Team (Group)</span>
-                       </div>
-                       <span className="text-[9px] font-black text-blue-500 uppercase bg-blue-500/10 px-2 py-1 rounded">Read/Write</span>
-                    </div>
-                    <div className="flex items-center justify-between p-4 bg-black/40 rounded-2xl border border-zinc-800">
-                       <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-zinc-700 flex items-center justify-center text-[10px] font-black text-zinc-500">PR</div>
-                          <span className="text-xs font-bold text-zinc-300">Producers (Group)</span>
-                       </div>
-                       <span className="text-[9px] font-black text-zinc-500 uppercase bg-zinc-800 px-2 py-1 rounded">Read Only</span>
-                    </div>
+                    
+                    {/* Inherited Permissions */}
+                    {inheritedPermissions.map(({ user, source }, i) => (
+                      <div key={`inherited-${i}`} className="flex items-center justify-between p-4 bg-zinc-800/20 rounded-2xl border border-zinc-800/50 opacity-60">
+                         <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-zinc-700 flex items-center justify-center text-[10px] font-black uppercase">{user.email[0]}</div>
+                            <div className="flex flex-col">
+                              <span className="text-xs font-bold text-zinc-300">{user.email}</span>
+                              <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Inherited from {source}</span>
+                            </div>
+                         </div>
+                         <span className="text-[9px] font-black text-zinc-500 uppercase bg-zinc-800 px-2 py-1 rounded">{user.role}</span>
+                      </div>
+                    ))}
+
+                    {/* Direct Permissions */}
+                    {selectedFolder.permissions?.sharedWith?.map(user => (
+                      <div key={user.id} className="flex items-center justify-between p-4 bg-black/40 rounded-2xl border border-zinc-800 group">
+                         <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-[10px] font-black uppercase">{user.email[0]}</div>
+                            <span className="text-xs font-bold text-zinc-300">{user.email}</span>
+                         </div>
+                         <div className="flex items-center gap-3">
+                           <span className="text-[9px] font-black text-blue-500 uppercase bg-blue-500/10 px-2 py-1 rounded">{user.role}</span>
+                           <button 
+                            onClick={() => unshareFolder(selectedFolder.id, user.id)}
+                            className="p-1.5 text-zinc-600 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                           >
+                             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                           </button>
+                         </div>
+                      </div>
+                    ))}
+
+                    {(!selectedFolder.permissions?.sharedWith?.length && !inheritedPermissions.length) && (
+                      <div className="py-8 text-center border-2 border-dashed border-zinc-800 rounded-2xl">
+                        <span className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">No Active Propagation Vectors</span>
+                      </div>
+                    )}
                  </div>
               </div>
 
               <div className="flex gap-4">
                  <button 
-                  onClick={() => {
-                    const folder = folders.find(f => f.id === selectedFolderForShare);
-                    if (folder) updateFolderPermissions(folder.id, ['placeholder-shared-id']);
-                    setIsShareModalOpen(false);
-                  }}
+                  onClick={() => setIsShareModalOpen(false)}
                   className="flex-1 py-4 bg-blue-600 text-white text-[11px] font-black uppercase rounded-2xl hover:bg-blue-500 transition-all shadow-xl shadow-blue-600/20"
                  >
-                   Apply Permissions
+                   Done
                  </button>
-                 <button onClick={() => setIsShareModalOpen(false)} className="flex-1 py-4 bg-zinc-800 text-white text-[11px] font-black uppercase rounded-2xl hover:bg-zinc-700 transition-all">Discard</button>
               </div>
            </div>
         </div>

@@ -73,65 +73,6 @@ const PropertyInput = ({ label, value, onChange, onCommit, suffix = "" }: { labe
   </div>
 );
 
-// --- ITEM 26: FOLLOW MODE OVERLAY ---
-const FollowModeOverlay = ({ isActive, events, onClose }: { isActive: boolean, events: any[], onClose: () => void }) => {
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [events]);
-
-  if (!isActive) return null;
-
-  return (
-    <div className="fixed bottom-24 right-10 w-96 max-h-[500px] bg-black/90 backdrop-blur-2xl border border-blue-500/30 rounded-3xl shadow-[0_0_80px_rgba(59,130,246,0.3)] z-[200] flex flex-col overflow-hidden animate-in slide-in-from-right duration-500">
-      <div className="p-5 border-b border-zinc-800 bg-blue-600/10 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-2 h-2 rounded-full bg-blue-500 animate-ping" />
-          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400">Follow-the-Data Mode</span>
-        </div>
-        <button onClick={onClose} className="p-1 text-zinc-500 hover:text-white transition-colors">
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 6 6 18M6 6l12 12"/></svg>
-        </button>
-      </div>
-      
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar bg-black/20">
-        {events.length === 0 && (
-          <div className="py-12 flex flex-col items-center justify-center opacity-30 gap-4">
-             <div className="w-10 h-10 border-2 border-dashed border-zinc-600 rounded-full animate-spin" />
-             <span className="text-[10px] font-mono uppercase tracking-widest">Awaiting Bus Logic...</span>
-          </div>
-        )}
-        {events.map((ev, i) => (
-          <div key={i} className={`p-4 rounded-2xl border ${ev.type === 'FOLLOW_START' ? 'bg-zinc-800/40 border-zinc-700' : ev.type === 'FOLLOW_END' ? 'bg-green-600/10 border-green-500/40' : 'bg-black/40 border-zinc-800'} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[8px] font-mono text-zinc-500">{new Date(ev.ts).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-              {ev.stepIndex && <span className="text-[8px] font-black bg-blue-600 text-white px-1.5 py-0.5 rounded">STEP {ev.stepIndex}</span>}
-            </div>
-            <p className="text-[11px] font-bold text-zinc-300 uppercase tracking-tight">{ev.message || ev.nodeType || 'Event'}</p>
-            {ev.outputs && (
-              <pre className="mt-3 p-3 bg-black/60 rounded-xl text-[9px] font-mono text-blue-400 overflow-x-auto">
-                {JSON.stringify(ev.outputs, null, 2)}
-              </pre>
-            )}
-            {ev.finalResult && (
-              <div className="mt-3 p-3 bg-green-500/10 rounded-xl">
-                 <span className="text-[8px] font-black text-green-500 uppercase block mb-1">Final Bus Payload</span>
-                 <pre className="text-[9px] font-mono text-green-400 whitespace-pre-wrap">{JSON.stringify(ev.finalResult, null, 2)}</pre>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-      <div className="p-4 bg-zinc-900/50 border-t border-zinc-800 text-[8px] font-mono text-zinc-600 uppercase text-center tracking-[0.3em]">
-        Observing special.debug.follow
-      </div>
-    </div>
-  );
-};
-
 // --- STUDIO APP FEATURE ---
 const StudioApp = () => {
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -146,17 +87,7 @@ const StudioApp = () => {
   const [showSafeZones, setShowSafeZones] = useState(true);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   
-  // ITEM 26: Follow Mode State
-  const [followActive, setFollowActive] = useState(false);
-  const [followEvents, setFollowEvents] = useState<any[]>([]);
-
-  // ITEM 24: Resizable Inspector State
-  const [inspectorWidth, setInspectorWidth] = useState(() => {
-    const saved = localStorage.getItem('rl-inspector-width');
-    return saved ? parseInt(saved, 10) : 320;
-  });
-
-  const { isPanelOpen, setPanelOpen } = useAssetsStore();
+  const { isPanelOpen, setPanelOpen, isExplorerOpen, isNewFolderDialogOpen } = useAssetsStore();
 
   const [layout, setLayout] = useState<Layout>({
     guides: [],
@@ -260,58 +191,6 @@ const StudioApp = () => {
   };
 
   const effectiveTool = useMemo(() => isSpacePressed ? 'hand' : tool, [isSpacePressed, tool]);
-
-  // ITEM 26: Follow Mode Activation
-  const handleFollowData = async () => {
-    setFollowActive(true);
-    setFollowEvents([]);
-    
-    // Wire SSE listener for the debug topic
-    const eventSource = new EventSource('/v1/live/stream/debug.follow.*');
-    eventSource.onmessage = (e) => {
-      const payload = JSON.parse(e.data);
-      if (payload.data) {
-        setFollowEvents(prev => [...prev, payload.data]);
-      }
-    };
-
-    try {
-      await fetch('/v1/follow-the-data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-rl-org-id': 'org_demo', 'x-rl-api-key': 'devkey_123' },
-        body: JSON.stringify({ graphId: 'mlb_demo_graph' }) 
-      });
-    } catch (err) {
-      console.error("Follow Mode Start Failed", err);
-    }
-  };
-
-  // ITEM 24: Resizing Logic
-  const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    const startX = e.clientX;
-    const startWidth = inspectorWidth;
-
-    const onMouseMove = (moveEvent: MouseEvent) => {
-      const delta = startX - moveEvent.clientX;
-      const newWidth = Math.min(Math.max(startWidth + delta, 280), 600);
-      setInspectorWidth(newWidth);
-    };
-
-    const onMouseUp = () => {
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-      document.body.style.cursor = 'default';
-    };
-
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-    document.body.style.cursor = 'col-resize';
-  }, [inspectorWidth]);
-
-  useEffect(() => {
-    localStorage.setItem('rl-inspector-width', inspectorWidth.toString());
-  }, [inspectorWidth]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -438,15 +317,6 @@ const StudioApp = () => {
               <button onClick={redo} disabled={redoStack.length === 0} className="p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 disabled:opacity-10"><svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="m15 14 5-5-5-5"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/></svg></button>
             </div>
           </div>
-          
-          <button 
-            onClick={handleFollowData}
-            className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-black uppercase rounded-2xl transition-all shadow-xl shadow-blue-600/20 flex items-center justify-center gap-3 border border-blue-400/30"
-          >
-            <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-            Follow the Data
-          </button>
-
           <div className="grid grid-cols-3 gap-2">
             <button onClick={() => addElement('text')} className="flex flex-col items-center justify-center gap-2 py-4 bg-zinc-800/40 border border-zinc-800 rounded-2xl transition-all group hover:bg-zinc-800 hover:border-zinc-500">
               <div className="text-zinc-500 group-hover:text-blue-400 transition-colors"><svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg></div>
@@ -536,15 +406,7 @@ const StudioApp = () => {
         </div>
       </div>
 
-      <div 
-        style={{ width: inspectorWidth }}
-        className="border-l border-zinc-800 flex flex-col bg-zinc-900 shadow-[-20px_0_60px_rgba(0,0,0,0.8)] z-40 relative group/sidebar"
-      >
-        <div 
-          onMouseDown={handleResizeMouseDown}
-          className="absolute left-[-2px] top-0 bottom-0 w-1 cursor-col-resize z-50 hover:bg-blue-600/50 transition-colors bg-transparent"
-        />
-
+      <div className="w-80 border-l border-zinc-800 flex flex-col bg-zinc-900 shadow-[-20px_0_60px_rgba(0,0,0,0.8)] z-40">
         <div className="px-6 py-4 bg-black/10 border-b border-zinc-800"><h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Inspector</h3></div>
         <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8 pb-32">
           {selectedElements.length === 1 ? (
@@ -564,133 +426,86 @@ const StudioApp = () => {
                     <label className="text-[9px] font-black uppercase text-zinc-500 tracking-widest px-1">Text Content</label>
                     <textarea value={selectedElements[0].data?.text || ''} onChange={(e) => updateElement(selectedElements[0].id, { data: { ...selectedElements[0].data, text: e.target.value } })} onBlur={() => commitToHistory()} className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-[11px] font-bold text-zinc-300 focus:border-blue-500/50 outline-none min-h-[100px] transition-all pointer-events-auto resize-none" />
                   </div>
+                  <div className="space-y-4" onPointerDown={(e) => e.stopPropagation()}>
+                    <label className="text-[9px] font-black uppercase text-zinc-500 tracking-widest px-1">Justification</label>
+                    <div className="grid grid-cols-3 gap-1 p-1 bg-black/40 rounded-xl border border-zinc-800">
+                      {[
+                        { v: 'top', h: 'left' }, { v: 'top', h: 'center' }, { v: 'top', h: 'right' },
+                        { v: 'middle', h: 'left' }, { v: 'middle', h: 'center' }, { v: 'middle', h: 'right' },
+                        { v: 'bottom', h: 'left' }, { v: 'bottom', h: 'center' }, { v: 'bottom', h: 'right' }
+                      ].map((pos) => {
+                        const isActive = (selectedElements[0].data?.verticalAlign || 'top') === pos.v && (selectedElements[0].style?.textAlign || 'left') === pos.h;
+                        return (
+                          <button key={`${pos.v}-${pos.h}`} onClick={() => { commitToHistory(); updateElement(selectedElements[0].id, { data: { ...selectedElements[0].data, verticalAlign: pos.v as any }, style: { ...selectedElements[0].style, textAlign: pos.h as any } }); }} className={`h-10 rounded-lg flex items-center justify-center transition-all ${isActive ? 'bg-blue-600 text-white shadow-lg' : 'text-zinc-600 hover:bg-zinc-800'}`}>
+                            <div className={`w-4 h-4 border border-current rounded-sm relative flex flex-col ${pos.v === 'top' ? 'justify-start' : pos.v === 'middle' ? 'justify-center' : 'justify-end'} ${pos.h === 'left' ? 'items-start' : pos.h === 'center' ? 'items-center' : 'items-end'}`}><div className="w-[50%] h-[2px] bg-current m-0.5 rounded-full" /></div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </>
               )}
 
               <div className="space-y-6 pt-4 border-t border-zinc-800/50">
                 <label className="text-[9px] font-black uppercase text-zinc-500 tracking-widest px-1">Appearance</label>
+                
                 <PropertyInput label="Layer Overall Opacity" suffix="%" value={Math.round(Number(selectedElements[0].style?.opacity ?? 1) * 100)} onChange={(v) => {
                   const num = parseInt(v) || 0;
                   updateElement(selectedElements[0].id, { style: { ...selectedElements[0].style, opacity: Math.min(Math.max(num / 100, 0), 1) } });
                 }} onCommit={commitToHistory} />
-                <ColorSwatch label="Fill Layer" color={selectedElements[0].style?.backgroundColor as string} onChange={(v) => updateElement(selectedElements[0].id, { style: { ...selectedElements[0].style, backgroundColor: v } })} onCommit={commitToHistory} />
+
+                {selectedElements[0].type === 'text' && (
+                  <ColorSwatch label="Text Style" color={selectedElements[0].style?.color as string} onChange={(v) => updateElement(selectedElements[0].id, { style: { ...selectedElements[0].style, color: v } })} onCommit={commitToHistory} />
+                )}
+                
+                <div className="space-y-4">
+                  <ColorSwatch label="Fill Layer" color={selectedElements[0].style?.backgroundColor as string} onChange={(v) => updateElement(selectedElements[0].id, { style: { ...selectedElements[0].style, backgroundColor: v } })} onCommit={commitToHistory} />
+                  <PropertyInput label="Fill Opacity" suffix="%" value={Math.round((selectedElements[0].style?.fillOpacity ?? 1) * 100)} onChange={(v) => {
+                    const num = parseInt(v) || 0;
+                    updateElement(selectedElements[0].id, { style: { ...selectedElements[0].style, fillOpacity: Math.min(Math.max(num / 100, 0), 1) } });
+                  }} onCommit={commitToHistory} />
+                </div>
+
+                <div className="space-y-4 pt-2 border-t border-zinc-800/30">
+                  <div className="grid grid-cols-[1fr_80px] gap-3 items-end">
+                    <ColorSwatch label="Stroke Outline" color={selectedElements[0].style?.borderColor as string} onChange={(v) => updateElement(selectedElements[0].id, { style: { ...selectedElements[0].style, borderColor: v, borderStyle: v === 'transparent' ? 'none' : 'solid' } })} onCommit={commitToHistory} />
+                    <div className="space-y-1.5 pb-1 pointer-events-auto">
+                       <span className="text-[8px] font-mono text-zinc-600 uppercase px-1">Weight</span>
+                       <input type="number" onMouseDown={(e) => e.stopPropagation()} value={parseInt(selectedElements[0].style?.borderWidth as string) || 0} onChange={(e) => updateElement(selectedElements[0].id, { style: { ...selectedElements[0].style, borderWidth: `${e.target.value}px`, borderStyle: 'solid' } })} onBlur={() => commitToHistory()} className="w-full bg-black border border-zinc-800 rounded-xl px-2.5 py-3 text-[11px] font-mono text-zinc-400 text-center outline-none transition-all focus:border-blue-500/50" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5 pointer-events-auto"><span className="text-[8px] font-mono text-zinc-600 uppercase px-1">Corner</span><input type="number" onMouseDown={(e) => e.stopPropagation()} value={parseInt(selectedElements[0].style?.borderRadius as string) || 0} onChange={(e) => updateElement(selectedElements[0].id, { style: { ...selectedElements[0].style, borderRadius: `${e.target.value}px` } })} onBlur={() => commitToHistory()} className="w-full bg-black border border-zinc-800 rounded-xl px-2.5 py-3 text-[10px] font-mono text-zinc-400 outline-none transition-all focus:border-blue-500/50" /></div>
+                  <div className="space-y-1.5 pointer-events-auto"><span className="text-[8px] font-mono text-zinc-600 uppercase px-1">Padding</span><input type="number" onMouseDown={(e) => e.stopPropagation()} value={parseInt(selectedElements[0].style?.padding as string) || 0} onChange={(e) => updateElement(selectedElements[0].id, { style: { ...selectedElements[0].style, padding: `${e.target.value}px` } })} onBlur={() => commitToHistory()} className="w-full bg-black border border-zinc-800 rounded-xl px-2.5 py-3 text-[10px] font-mono text-zinc-400 outline-none transition-all focus:border-blue-500/50" /></div>
+                </div>
               </div>
 
               <div className="space-y-3 pt-4 border-t border-zinc-800/50">
-                <div className="flex items-center justify-between px-1">
-                  <label className="text-[9px] font-black uppercase text-zinc-500 tracking-widest">Live Bus Monitor</label>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.4)]" />
-                    <span className="text-[8px] font-mono text-green-500 uppercase tracking-tighter">Connected</span>
-                  </div>
-                </div>
-                <div className="bg-black/60 rounded-2xl border border-zinc-800/80 overflow-hidden shadow-xl">
-                  <div className="p-3 border-b border-zinc-800/50 flex items-center justify-between bg-zinc-900/40">
-                    <span className="text-[9px] font-mono text-blue-400">mlb.game.sim</span>
-                    <span className="text-[8px] font-mono text-zinc-600 uppercase">SEQ: 1.04k</span>
-                  </div>
-                  <div className="p-4 h-32 overflow-y-auto custom-scrollbar bg-black/30">
-                    <pre className="text-[9px] font-mono text-zinc-500 leading-relaxed">
-{`{
-  "home": { "runs": 5 },
-  "away": { "runs": 3 },
-  "inning": 8,
-  "half": "top",
-  "outs": 2,
-  "count": { "b": 2, "s": 1 }
-}`}
-                    </pre>
-                  </div>
+                <label className="text-[9px] font-black uppercase text-zinc-500 tracking-widest px-1">Metrics</label>
+                <div className="grid grid-cols-2 gap-3 pointer-events-auto">
+                  {['x', 'y', 'width', 'height'].map((prop) => {
+                    const isDim = prop === 'width' || prop === 'height';
+                    const isDisabled = isDim && selectedElements[0].data?.textType === 'point';
+                    return (
+                      <div key={prop} className={`space-y-1.5 transition-opacity ${isDisabled ? 'opacity-30' : ''}`}>
+                        <span className="text-[8px] font-mono text-zinc-600 uppercase px-1">{prop.charAt(0)}</span>
+                        <input type="number" onMouseDown={(e) => e.stopPropagation()} disabled={isDisabled} value={Math.round(Number((selectedElements[0] as any)[prop]))} onChange={(e) => updateElement(selectedElements[0].id, { [prop]: parseInt(e.target.value) || 0 })} onBlur={() => commitToHistory()} className="w-full bg-black border border-zinc-800 rounded px-2.5 py-2 text-[10px] font-mono text-zinc-400 outline-none transition-all focus:border-blue-500/50" />
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center h-full gap-4 opacity-30 mt-32">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] leading-loose text-center">Select a layer<br/>to begin editing</p>
-            </div>
+            <div className="flex flex-col items-center justify-center h-full gap-4 opacity-30 mt-32"><p className="text-[10px] font-black uppercase tracking-[0.2em] leading-loose text-center">Select a layer<br/>to begin editing</p></div>
           )}
         </div>
       </div>
 
-      <FollowModeOverlay isActive={followActive} events={followEvents} onClose={() => setFollowActive(false)} />
-      <AssetExplorer />
-      <NewFolderDialog />
-    </div>
-  );
-};
-
-// --- ITEM 27: DATA ENGINE APP (HEARTBEAT) ---
-const DataEngineAppImpl: React.FC = () => {
-  const [testResult, setTestResult] = useState<any | null>(null);
-  const [isRunning, setIsRunning] = useState(false);
-
-  const runTestGraph = async () => {
-    setIsRunning(true);
-    try {
-      const response = await fetch('/v1/demo/hello-data-engine', {
-        method: 'POST',
-        headers: { 'x-rl-org-id': 'org_demo', 'x-rl-api-key': 'devkey_123' }
-      });
-      const res = await response.json();
-      if (res.ok) setTestResult(res.data);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsRunning(false);
-    }
-  };
-
-  return (
-    <div className="flex-1 flex flex-col bg-[#050506] overflow-hidden animate-in fade-in duration-500 p-10">
-      <div className="flex items-center justify-between mb-10 shrink-0">
-         <div>
-            <h2 className="text-xl font-black uppercase tracking-tight">Data Logic Center</h2>
-            <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mt-1">Heartbeat Stage for engine diagnostics</p>
-         </div>
-         <button 
-           onClick={runTestGraph}
-           disabled={isRunning}
-           className="px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white text-[12px] font-black uppercase rounded-2xl transition-all shadow-xl shadow-blue-600/20 flex items-center gap-3 disabled:opacity-50"
-         >
-           {isRunning ? <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" /> : <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>}
-           Run Test Graph
-         </button>
-      </div>
-
-      <div className="flex-1 grid grid-cols-3 gap-8 overflow-hidden">
-         {/* INPUT BLOCK */}
-         <div className="flex flex-col bg-zinc-900/50 border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl">
-            <div className="p-5 border-b border-zinc-800 bg-zinc-800/20 flex items-center justify-between">
-               <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">1. Initial Input</span>
-               <div className="w-2 h-2 rounded-full bg-zinc-700" />
-            </div>
-            <div className="flex-1 p-6 font-mono text-[11px] text-blue-400 overflow-auto custom-scrollbar">
-               {testResult ? <pre>{JSON.stringify(testResult.input, null, 2)}</pre> : <span className="opacity-20">Waiting for trigger...</span>}
-            </div>
-         </div>
-
-         {/* TRANSFORM BLOCK */}
-         <div className="flex flex-col bg-zinc-900/50 border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl">
-            <div className="p-5 border-b border-zinc-800 bg-zinc-800/20 flex items-center justify-between">
-               <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">2. Node Processing</span>
-               <div className="w-2 h-2 rounded-full bg-blue-500" />
-            </div>
-            <div className="flex-1 p-6 font-mono text-[11px] text-zinc-500 overflow-auto custom-scrollbar">
-               {testResult && testResult.trace ? <pre>{JSON.stringify(testResult.trace[1].outputs, null, 2)}</pre> : <span className="opacity-20 italic">Awaiting trace data...</span>}
-            </div>
-         </div>
-
-         {/* OUTPUT BLOCK */}
-         <div className="flex flex-col bg-zinc-900/50 border border-blue-500/20 rounded-3xl overflow-hidden shadow-2xl">
-            <div className="p-5 border-b border-zinc-800 bg-blue-600/10 flex items-center justify-between">
-               <span className="text-[10px] font-black uppercase tracking-widest text-blue-400">3. Final Result</span>
-               <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]" />
-            </div>
-            <div className="flex-1 p-6 font-mono text-[11px] text-green-400 overflow-auto custom-scrollbar bg-green-500/[0.02]">
-               {testResult ? <pre>{JSON.stringify(testResult.finalOutput, null, 2)}</pre> : <span className="opacity-20 italic">Awaiting completion...</span>}
-            </div>
-         </div>
-      </div>
+      {isExplorerOpen && <AssetExplorer />}
+      {isNewFolderDialogOpen && <NewFolderDialog />}
     </div>
   );
 };
@@ -707,13 +522,18 @@ const NavigationHeader = ({ current, onSwitch }: { current: string, onSwitch: (v
         <span className="text-[7px] text-zinc-600 font-bold uppercase tracking-tight mt-0.5">Live Engine Workspace</span>
       </div>
     </div>
+
     <nav className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-zinc-800/50">
       {['STUDIO', 'CONTROL', 'DATA ENGINE', 'OUTPUT'].map(item => {
         const value = item === 'DATA ENGINE' ? 'DATA_ENGINE' : item;
         const isActive = (item === 'STUDIO' && current === 'STUDIO') || (item === 'DATA ENGINE' && current === 'DATA_ENGINE');
         const isClickable = item === 'STUDIO' || item === 'DATA ENGINE';
+        
         return (
-          <button key={item} disabled={!isClickable} onClick={() => isClickable && onSwitch(value as any)}
+          <button 
+            key={item}
+            disabled={!isClickable}
+            onClick={() => isClickable && onSwitch(value as any)}
             className={`px-5 py-2 rounded-lg text-[9px] font-black uppercase tracking-[0.1em] transition-all ${isActive ? 'bg-zinc-800 text-blue-400 shadow-inner' : 'text-zinc-500 hover:text-zinc-300 disabled:opacity-30'}`}
           >
             {item}
@@ -721,25 +541,36 @@ const NavigationHeader = ({ current, onSwitch }: { current: string, onSwitch: (v
         );
       })}
     </nav>
+
     <div className="flex items-center gap-6">
        <div className="flex items-center gap-2">
          <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
          <span className="text-[9px] font-black text-green-500/80 uppercase tracking-widest">Systems Online</span>
        </div>
+       <div className="flex items-center gap-2 bg-zinc-900/50 px-3 py-1.5 rounded-lg border border-zinc-800">
+         <span className="text-[10px] font-mono text-zinc-500">RD</span>
+       </div>
     </div>
   </header>
 );
 
+// --- MASTER APP COMPONENT ---
 const App = () => {
   const [view, setView] = useState<'STUDIO' | 'DATA_ENGINE'>('STUDIO');
+
   return (
     <div className="h-screen w-screen flex flex-col bg-[#050506] overflow-hidden">
       <NavigationHeader current={view} onSwitch={setView} />
       <main className="flex-1 flex overflow-hidden">
-        {view === 'STUDIO' ? <StudioApp /> : <DataEngineAppImpl />}
+        {view === 'STUDIO' ? <StudioApp /> : <DataEngineApp />}
       </main>
+      
+      {/* GLOBAL FOOTER */}
       <footer className="h-7 bg-black border-t border-zinc-900 flex items-center justify-between px-4 shrink-0 text-[8px] font-mono text-zinc-600 uppercase tracking-widest pointer-events-none">
-        <div className="flex gap-4"><span>ENV: Production v2.0.4-stable</span><span>Org: Red Bull Media House</span></div>
+        <div className="flex gap-4">
+          <span>ENV: Production v2.0.4-stable</span>
+          <span>Org: Red Bull Media House</span>
+        </div>
         <span>RDLSS-6782-SYS</span>
       </footer>
     </div>

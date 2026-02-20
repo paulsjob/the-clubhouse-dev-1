@@ -19,13 +19,7 @@ import { snapshotRoutes } from './routes/v1/snapshot';
 import { orgRoutes } from './routes/v1/orgs';
 import { schemaRoutes } from './routes/v1/schemas';
 import { bindingRoutes } from './routes/v1/bindings';
-import { bindingSetRoutes } from './routes/v1/bindingSets';
-import { simulationRoutes } from './routes/v1/simulations';
-import { busRoutes } from './routes/v1/bus';
-import { deployRoutes } from './routes/v1/deploy';
-import { engineRoutes } from './routes/v1/engine'; // ITEM 21
-import { followRoutes } from './routes/v1/follow';
-import { demoRoutes } from './routes/v1/demo';
+import { demoRoutes } from './routes/v1/demo'; // ITEM 17
 import pkg from '../package.json';
 
 export const buildServer = (): FastifyInstance => {
@@ -42,6 +36,7 @@ export const buildServer = (): FastifyInstance => {
     requestIdHeader: 'x-request-id',
   });
 
+  // ITEM 11: Swagger Registration
   server.register(swagger, {
     openapi: {
       info: {
@@ -111,13 +106,7 @@ export const buildServer = (): FastifyInstance => {
   server.register(orgRoutes);
   server.register(schemaRoutes);
   server.register(bindingRoutes);
-  server.register(bindingSetRoutes);
-  server.register(simulationRoutes);
-  server.register(busRoutes);
-  server.register(deployRoutes);
-  server.register(engineRoutes); // ITEM 21
-  server.register(followRoutes);
-  server.register(demoRoutes);
+  server.register(demoRoutes); // ITEM 17
 
   return server;
 };

@@ -21,10 +21,15 @@ export interface Folder {
   parentId: string | null;
   createdAt: number;
   updatedAt: number;
-  permissions?: {
-    entries: string[]; // Placeholder for user/group IDs
+  permissions: {
+    sharedWith: {
+      id: string;
+      email: string;
+      role: 'read' | 'write' | 'admin';
+    }[];
+    isPublic?: boolean;
   };
-  watch?: boolean; // Placeholder flag
+  watch?: boolean;
 }
 
 export type ViewMode = 'grid' | 'list';

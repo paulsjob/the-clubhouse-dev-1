@@ -9,7 +9,6 @@ export interface ExecutionTrace {
   startedAt: number;
   durationMs: number;
   outputPorts: string[];
-  outputs?: Record<string, any>; // ITEM 23: Data capture for debugging
 }
 
 export interface ExecutionResult {
@@ -41,9 +40,7 @@ export class GraphExecutor {
         type: node.type,
         startedAt: start,
         durationMs: Date.now() - start,
-        outputPorts: Object.keys(outputs),
-        // ITEM 23: Only include output data in trace if explicitly requested (e.g., Preview)
-        outputs: params.__debug ? outputs : undefined 
+        outputPorts: Object.keys(outputs)
       });
     }
 
@@ -55,7 +52,7 @@ export class GraphExecutor {
 
     return {
       result,
-      trace: (params.__trace || params.__debug) ? trace : undefined
+      trace: params.__trace ? trace : undefined
     };
   }
 

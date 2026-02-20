@@ -8,11 +8,8 @@ export const NewFolderDialog: React.FC = () => {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (isNewFolderDialogOpen) {
-      setName('');
-      setTimeout(() => inputRef.current?.focus(), 50);
-    }
-  }, [isNewFolderDialogOpen]);
+    setTimeout(() => inputRef.current?.focus(), 50);
+  }, []);
 
   if (!isNewFolderDialogOpen) return null;
 
